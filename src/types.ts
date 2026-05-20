@@ -403,6 +403,10 @@ export interface TaskRow {
   updated_at: string;
 }
 
+export interface ArchivedTaskRow extends TaskRow {
+  archived_at: string;
+}
+
 export interface ToolRow {
   name: string;
   description: string;

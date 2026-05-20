@@ -1015,6 +1015,9 @@ export interface TaskRow {
     created_at: string;
     updated_at: string;
 }
+export interface ArchivedTaskRow extends TaskRow {
+    archived_at: string;
+}
 export interface ToolRow {
     name: string;
     description: string;

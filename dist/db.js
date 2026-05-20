@@ -72,7 +72,7 @@ function initSchema() {
       title         TEXT NOT NULL,
       description   TEXT,
       goal          TEXT,
-      status        TEXT NOT NULL DEFAULT 'pending',
+      status        TEXT NOT NULL,
       tool_name     TEXT,
       result        TEXT,
       error         TEXT,
