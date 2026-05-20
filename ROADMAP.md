@@ -33,7 +33,7 @@
 | 15 | tool_deprecate — deprecate/remove tools | ⬜ pending | 🟢 Registry |
 | 16 | tool_export — export all tools to JSON | ⬜ pending | 🟢 Data Portability |
 | 17 | tool_import — bulk import tools from JSON | ✅ done | 🟢 Data Portability |
-| 18 | tool_stats — registry statistics | ⬜ pending | 🟢 Data Query |
+| 18 | tool_stats — registry statistics | ✅ done | 🟢 Data Query |
 
 ## Phase 4: Quality & Accountability
 | # | Feature | Status | Moat |

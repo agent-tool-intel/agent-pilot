@@ -168,11 +168,11 @@ export async function handleToolDeprecate(args: unknown) {
 export async function handleToolStats(_args: unknown) {
   const db = getDb();
 
-  const totalRow = db.prepare('SELECT COUNT(*) as c FROM tools').get() as { c: number };
-  const total = totalRow.c;
-
-  const deprecatedRow = db.prepare("SELECT COUNT(*) as c FROM tools WHERE description LIKE '[DEPRECATED]%'").get() as { c: number };
-  const deprecated = deprecatedRow.c;
+  const statsRow = db.prepare(
+    "SELECT COUNT(*) as total, SUM(CASE WHEN description LIKE '[DEPRECATED]%' THEN 1 ELSE 0 END) as deprecated FROM tools"
+  ).get() as { total: number; deprecated: number };
+  const total = Number(statsRow.total);
+  const deprecated = Number(statsRow.deprecated);
 
   const active = total - deprecated;
 
