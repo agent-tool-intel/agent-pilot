@@ -1,11 +1,5 @@
-import { z } from 'zod';
 import { getDb, getLatestRoot } from './db.js';
-import { toMCPResponse, type TaskRow } from './types.js';
-
-const DepGraphInput = z.object({
-  task_id: z.string().optional().describe('Root task ID; defaults to latest root'),
-  format: z.enum(['mermaid', 'ascii', 'json']).optional().default('mermaid'),
-});
+import { toMCPResponse, TaskDependencyGraphInput, type TaskRow } from './types.js';
 
 interface GraphNode {
   id: string;
@@ -32,12 +26,20 @@ function buildGraph(tasks: TaskRow[], rootId: string): Graph {
     taskMap.set(t.id, t);
   }
 
+  const childrenMap = new Map<string, string[]>();
+  for (const t of tasks) {
+    if (!t.parent_id) continue;
+    const arr = childrenMap.get(t.parent_id) || [];
+    arr.push(t.id);
+    childrenMap.set(t.parent_id, arr);
+  }
+
   const depthMap = new Map<string, number>();
   function computeDepth(id: string, depth: number) {
     if (depthMap.has(id)) return;
     depthMap.set(id, depth);
-    for (const t of tasks) {
-      if (t.parent_id === id) computeDepth(t.id, depth + 1);
+    for (const childId of childrenMap.get(id) || []) {
+      computeDepth(childId, depth + 1);
     }
   }
   computeDepth(rootId, 0);
@@ -69,12 +71,17 @@ function sanitizeMermaidId(id: string): string {
   return 'T_' + id.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+function escapeMermaidLabel(text: string): string {
+  return text.replace(/"/g, '#quot;');
+}
+
 function buildMermaid(graph: Graph): string {
   const lines: string[] = ['graph TD'];
   for (const node of graph.nodes) {
     const mid = sanitizeMermaidId(node.id);
+    const label = escapeMermaidLabel(node.title);
     const statusBadge = node.status !== 'pending' ? ` (${node.status})` : '';
-    lines.push(`    ${mid}["${node.title}${statusBadge}"]`);
+    lines.push(`    ${mid}[${JSON.stringify(label + statusBadge)}]`);
   }
   for (const edge of graph.edges) {
     const from = sanitizeMermaidId(edge.from);
@@ -150,7 +157,7 @@ function buildJson(graph: Graph) {
 }
 
 export async function handleTaskDependencyGraph(args: unknown) {
-  const input = DepGraphInput.parse(args);
+  const input = TaskDependencyGraphInput.parse(args);
   const db = getDb();
 
   const rootId = input.task_id || getLatestRoot(db);

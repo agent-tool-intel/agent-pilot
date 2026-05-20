@@ -983,6 +983,17 @@ export declare const TaskRollbackOutput: z.ZodObject<{
     rolled_back_to: string;
 }>;
 export type TaskRollbackOutput = z.infer<typeof TaskRollbackOutput>;
+export declare const TaskDependencyGraphInput: z.ZodObject<{
+    task_id: z.ZodOptional<z.ZodString>;
+    format: z.ZodDefault<z.ZodOptional<z.ZodEnum<["mermaid", "ascii", "json"]>>>;
+}, "strip", z.ZodTypeAny, {
+    format: "json" | "mermaid" | "ascii";
+    task_id?: string | undefined;
+}, {
+    task_id?: string | undefined;
+    format?: "json" | "mermaid" | "ascii" | undefined;
+}>;
+export type TaskDependencyGraphInput = z.infer<typeof TaskDependencyGraphInput>;
 export interface TaskRow {
     id: string;
     parent_id: string | null;

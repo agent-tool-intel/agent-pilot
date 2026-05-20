@@ -1,23 +1,25 @@
-import { z } from 'zod';
 import { getDb, getLatestRoot } from './db.js';
-import { toMCPResponse } from './types.js';
-const DepGraphInput = z.object({
-    task_id: z.string().optional().describe('Root task ID; defaults to latest root'),
-    format: z.enum(['mermaid', 'ascii', 'json']).optional().default('mermaid'),
-});
+import { toMCPResponse, TaskDependencyGraphInput } from './types.js';
 function buildGraph(tasks, rootId) {
     const taskMap = new Map();
     for (const t of tasks) {
         taskMap.set(t.id, t);
+    }
+    const childrenMap = new Map();
+    for (const t of tasks) {
+        if (!t.parent_id)
+            continue;
+        const arr = childrenMap.get(t.parent_id) || [];
+        arr.push(t.id);
+        childrenMap.set(t.parent_id, arr);
     }
     const depthMap = new Map();
     function computeDepth(id, depth) {
         if (depthMap.has(id))
             return;
         depthMap.set(id, depth);
-        for (const t of tasks) {
-            if (t.parent_id === id)
-                computeDepth(t.id, depth + 1);
+        for (const childId of childrenMap.get(id) || []) {
+            computeDepth(childId, depth + 1);
         }
     }
     computeDepth(rootId, 0);
@@ -44,12 +46,16 @@ function buildGraph(tasks, rootId) {
 function sanitizeMermaidId(id) {
     return 'T_' + id.replace(/[^a-zA-Z0-9]/g, '_');
 }
+function escapeMermaidLabel(text) {
+    return text.replace(/"/g, '#quot;');
+}
 function buildMermaid(graph) {
     const lines = ['graph TD'];
     for (const node of graph.nodes) {
         const mid = sanitizeMermaidId(node.id);
+        const label = escapeMermaidLabel(node.title);
         const statusBadge = node.status !== 'pending' ? ` (${node.status})` : '';
-        lines.push(`    ${mid}["${node.title}${statusBadge}"]`);
+        lines.push(`    ${mid}[${JSON.stringify(label + statusBadge)}]`);
     }
     for (const edge of graph.edges) {
         const from = sanitizeMermaidId(edge.from);
@@ -120,7 +126,7 @@ function buildJson(graph) {
     };
 }
 export async function handleTaskDependencyGraph(args) {
-    const input = DepGraphInput.parse(args);
+    const input = TaskDependencyGraphInput.parse(args);
     const db = getDb();
     const rootId = input.task_id || getLatestRoot(db);
     if (!rootId) {

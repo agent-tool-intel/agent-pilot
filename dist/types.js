@@ -302,6 +302,11 @@ export const TaskRollbackOutput = z.object({
     rolled_back_from: z.string(),
     rolled_back_to: z.string(),
 });
+// ─── task_dependency_graph ───
+export const TaskDependencyGraphInput = z.object({
+    task_id: z.string().optional().describe('Root task ID; defaults to latest root'),
+    format: z.enum(['mermaid', 'ascii', 'json']).optional().default('mermaid'),
+});
 // ─── 12. task_audit_log ───
 export const TaskAuditLogInput = z.object({
     task_id: z.string().optional().describe('Filter by task ID (optional)'),
