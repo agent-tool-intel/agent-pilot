@@ -26,7 +26,7 @@ function validateEntry(entry: unknown, index: number): { valid: true; entry: Too
       description: e.description,
       schema: e.schema,
       provider: e.provider,
-      tags: Array.isArray(e.tags) ? e.tags.filter((t: unknown) => typeof t === 'string') : undefined,
+      tags: Array.isArray(e.tags) ? e.tags.filter((t: unknown) => typeof t === 'string' && !(t as string).includes(',')) : undefined,
       created_at: typeof e.created_at === 'string' ? e.created_at : undefined,
     },
   };
@@ -92,7 +92,7 @@ export async function handleToolImport(args: unknown) {
         ).run(entry.name);
         db.prepare(
           'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
-        ).run(entry.name, entry.description, tags);
+        ).run(entry.name, entry.name, entry.description, tags);
       } catch {
         // FTS5 not available
       }

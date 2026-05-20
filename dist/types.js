@@ -128,7 +128,7 @@ export const ToolRegisterInput = z.object({
     description: z.string().min(1).describe('What this tool does'),
     schema: z.string().describe('JSON Schema string of input parameters'),
     provider: z.string().describe('Which MCP server or service provides this'),
-    tags: z.array(z.string()).optional().default([]),
+    tags: z.array(z.string().regex(/^[^,]+$/, 'Tags cannot contain commas')).optional().default([]),
 });
 export const ToolRegisterOutput = z.object({
     name: z.string(),
@@ -144,7 +144,7 @@ export const ToolUpdateInput = z.object({
     description: z.string().min(1).optional().describe('New description'),
     schema: z.string().min(1).optional().describe('New JSON Schema string'),
     provider: z.string().min(1).optional().describe('New provider'),
-    tags: z.array(z.string().min(1)).optional().describe('New tags for searchability'),
+    tags: z.array(z.string().min(1).regex(/^[^,]+$/, 'Tags cannot contain commas')).optional().describe('New tags for searchability'),
 });
 export const ToolUpdateOutput = z.object({
     name: z.string(),

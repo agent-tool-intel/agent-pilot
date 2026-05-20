@@ -25,7 +25,7 @@ function validateEntry(entry, index) {
             description: e.description,
             schema: e.schema,
             provider: e.provider,
-            tags: Array.isArray(e.tags) ? e.tags.filter((t) => typeof t === 'string') : undefined,
+            tags: Array.isArray(e.tags) ? e.tags.filter((t) => typeof t === 'string' && !t.includes(',')) : undefined,
             created_at: typeof e.created_at === 'string' ? e.created_at : undefined,
         },
     };
@@ -77,7 +77,7 @@ export async function handleToolImport(args) {
             upsert.run(entry.name, entry.description, entry.schema, entry.provider, tags, created_at);
             try {
                 db.prepare('DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)').run(entry.name);
-                db.prepare('INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)').run(entry.name, entry.description, tags);
+                db.prepare('INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)').run(entry.name, entry.name, entry.description, tags);
             }
             catch {
                 // FTS5 not available

@@ -1,31 +1,33 @@
 import { getDb } from './db.js';
-import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
+import { ToolRegisterInput, ToolRegisterOutput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
 
 export async function handleToolRegister(args: unknown) {
   const input = ToolRegisterInput.parse(args);
   const db = getDb();
   const now = new Date().toISOString();
+  const sortedTags = [...input.tags].sort();
 
   db.prepare(
     'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(input.name, input.description, input.schema, input.provider, input.tags.join(','), now);
+  ).run(input.name, input.description, input.schema, input.provider, sortedTags.join(','), now);
 
   try {
     db.prepare(
       'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
-    ).run(input.name, input.description, input.tags.join(','));
+    ).run(input.name, input.name, input.description, sortedTags.join(','));
   } catch {
     // FTS5 not available
   }
 
-  return toMCPResponse({
+  const output = ToolRegisterOutput.parse({
     name: input.name,
     description: input.description,
     schema: input.schema,
     provider: input.provider,
-    tags: input.tags,
+    tags: sortedTags,
     created_at: now,
   });
+  return toMCPResponse(output);
 }
 
 export async function handleToolUpdate(args: unknown) {
@@ -44,22 +46,70 @@ export async function handleToolUpdate(args: unknown) {
   const sortedTags = [...tags].sort();
 
   const descChanged = description !== existing.description;
+  const schemaChanged = schema !== existing.schema;
+  const providerChanged = provider !== existing.provider;
   const existingTagsSorted = (existing.tags || '').split(',').filter(Boolean).sort();
-  const tagsChanged = sortedTags.join(',') !== existingTagsSorted.join(',');
+  const tagsChanged = input.tags !== undefined && sortedTags.join(',') !== existingTagsSorted.join(',');
+
+  const nothingChanged = !descChanged && !schemaChanged && !providerChanged && !tagsChanged;
+
+  const responseTags = input.tags !== undefined ? sortedTags : (existing.tags || '').split(',').filter(Boolean);
+
+  const parseResult = ToolUpdateOutput.safeParse({
+    name: input.name,
+    description,
+    schema,
+    provider,
+    tags: responseTags,
+    created_at: existing.created_at || new Date().toISOString(),
+  });
+  if (!parseResult.success) {
+    return toMCPResponse({ error: 'Data integrity error: ' + parseResult.error.message });
+  }
+
+  let ftsHasEntry = true;
+  try {
+    const row = db.prepare(
+      'SELECT COUNT(*) as cnt FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+    ).get(input.name) as { cnt: number } | undefined;
+    ftsHasEntry = (row?.cnt ?? 0) > 0;
+  } catch {
+    ftsHasEntry = false;
+  }
+
+  const isDeprecated = description.startsWith('[DEPRECATED]');
+
+  if (nothingChanged && ftsHasEntry) {
+    return toMCPResponse(parseResult.data);
+  }
+
+  const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
+
+  const ftsChanged = descChanged || tagsChanged || !ftsHasEntry;
+  const needsFtsDelete = isDeprecated || ftsChanged;
+  const needsFtsInsert = !isDeprecated && ftsChanged;
 
   const write = db.transaction(() => {
-    db.prepare(
-      'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
-    ).run(description, schema, provider, sortedTags.join(','), input.name);
+    if (descChanged || schemaChanged || providerChanged || tagsChanged) {
+      db.prepare(
+        'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
+      ).run(description, schema, provider, tagsToWrite, input.name);
+    }
 
-    if (descChanged || tagsChanged) {
+    if (needsFtsDelete) {
       try {
         db.prepare(
           'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
         ).run(input.name);
+      } catch {
+        // FTS5 not available
+      }
+    }
+    if (needsFtsInsert) {
+      try {
         db.prepare(
           'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
-        ).run(input.name, input.name, description, sortedTags.join(','));
+        ).run(input.name, input.name, description, tagsToWrite);
       } catch {
         // FTS5 not available
       }
@@ -67,14 +117,7 @@ export async function handleToolUpdate(args: unknown) {
   });
   write();
 
-  return toMCPResponse(ToolUpdateOutput.parse({
-    name: input.name,
-    description,
-    schema,
-    provider,
-    tags: sortedTags,
-    created_at: existing.created_at,
-  }));
+  return toMCPResponse(parseResult.data);
 }
 
 export async function handleToolSearch(args: unknown) {
