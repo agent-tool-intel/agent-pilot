@@ -328,7 +328,11 @@ export const TaskSnapshotOutput = z.object({
     task_count: z.number().describe('Number of tasks captured in the tree'),
     created_at: z.string().describe('ISO-8601 timestamp of snapshot creation'),
 });
-// ─── MCP response helper ───
-export function toMCPResponse(data) {
-    return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+// ─── MCP response helper — auto-detects error responses ───
+export function toMCPResponse(data, isError = false) {
+    const hasError = isError || (typeof data === 'object' && data !== null && 'error' in data);
+    return {
+        content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        ...(hasError ? { isError: true } : {}),
+    };
 }

@@ -446,7 +446,11 @@ export const TaskSnapshotOutput = z.object({
 });
 export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
 
-// ─── MCP response helper ───
-export function toMCPResponse(data: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+// ─── MCP response helper — auto-detects error responses ───
+export function toMCPResponse(data: unknown, isError = false) {
+  const hasError = isError || (typeof data === 'object' && data !== null && 'error' in (data as Record<string, unknown>));
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    ...(hasError ? { isError: true } : {}),
+  };
 }

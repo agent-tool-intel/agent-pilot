@@ -1100,7 +1100,8 @@ export declare const TaskSnapshotOutput: z.ZodObject<{
     snapshot_id: string;
 }>;
 export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
-export declare function toMCPResponse(data: unknown): {
+export declare function toMCPResponse(data: unknown, isError?: boolean): {
+    isError?: boolean | undefined;
     content: {
         type: "text";
         text: string;
