@@ -5,22 +5,33 @@ import { statSync, existsSync } from 'fs';
 export async function handleSystemInfo(_args: unknown) {
   const db = getDb();
 
-  const totalTasks = (db.prepare(
-    'SELECT COUNT(*) as count FROM tasks'
-  ).get() as { count: number }).count;
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%\\_fts%' ESCAPE '\\' ORDER BY name"
+  ).all() as { name: string }[];
 
-  const totalTools = (db.prepare(
-    'SELECT COUNT(*) as count FROM tools'
-  ).get() as { count: number }).count;
+  const tableRowCounts: Record<string, number> = {};
+  for (const table of tables) {
+    try {
+      const row = db.prepare(
+        `SELECT COUNT(*) as count FROM "${table.name}"`
+      ).get() as { count: number } | undefined;
+      tableRowCounts[table.name] = Number(row?.count ?? 0);
+    } catch (err) {
+      console.error(`Failed to count rows for table ${table.name}:`, err);
+      tableRowCounts[table.name] = -1;
+    }
+  }
 
-  const totalSnapshots = (db.prepare(
-    'SELECT COUNT(*) as count FROM snapshots'
-  ).get() as { count: number }).count;
+  const totalTasks = tableRowCounts.tasks ?? -1;
+  const totalTools = tableRowCounts.tools ?? -1;
+  const totalSnapshots = tableRowCounts.snapshots ?? -1;
+  const auditLogCount = tableRowCounts.audit_log ?? -1;
 
   let databaseFileSizeBytes = 0;
   try {
     databaseFileSizeBytes = statSync(DB_PATH).size;
-  } catch {
+  } catch (err) {
+    console.error('Failed to stat database file:', err);
     databaseFileSizeBytes = -1;
   }
 
@@ -42,35 +53,15 @@ export async function handleSystemInfo(_args: unknown) {
     walCheckpointPages = null;
   }
 
-  const tables = db.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%\\_fts%' ESCAPE '\\' ORDER BY name"
-  ).all() as { name: string }[];
-
-  const tableRowCounts: Record<string, number> = {};
-  for (const table of tables) {
-    try {
-      const countRow = db.prepare(
-        `SELECT COUNT(*) as count FROM "${table.name}"`
-      ).get() as { count: number };
-      tableRowCounts[table.name] = Number(countRow.count);
-    } catch {
-      tableRowCounts[table.name] = -1;
-    }
-  }
-
-  const auditLogCount = (db.prepare(
-    'SELECT COUNT(*) as count FROM audit_log'
-  ).get() as { count: number }).count;
-
   return toMCPResponse({
     server: {
       name: 'task-orchestrator',
       version: '0.2.0',
     },
-    total_tasks: Number(totalTasks),
-    total_tools: Number(totalTools),
-    total_snapshots: Number(totalSnapshots),
-    total_audit_log_entries: Number(auditLogCount),
+    total_tasks: totalTasks,
+    total_tools: totalTools,
+    total_snapshots: totalSnapshots,
+    total_audit_log_entries: auditLogCount,
     database_file_size_bytes: databaseFileSizeBytes,
     database_file_path: DB_PATH,
     journal_mode: journalMode,
