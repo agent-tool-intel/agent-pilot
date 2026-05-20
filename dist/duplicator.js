@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './db.js';
-import { TaskDuplicateInput, toMCPResponse, } from './types.js';
+import { TaskDuplicateInput, TaskDuplicateOutput, toMCPResponse, } from './types.js';
 export async function handleTaskDuplicate(args) {
     const input = TaskDuplicateInput.parse(args);
     const db = getDb();
@@ -16,18 +16,8 @@ export async function handleTaskDuplicate(args) {
   `).all(input.task_id);
     const idMap = new Map();
     const flatTasks = [];
-    const dbTasks = [...allTasks];
-    if (!allTasks.find(t => t.id === input.task_id)) {
-        dbTasks.unshift(root);
-    }
-    function computeDepth(taskId) {
-        const task = dbTasks.find(t => t.id === taskId);
-        if (!task || !task.parent_id)
-            return 0;
-        return 1 + computeDepth(task.parent_id);
-    }
     const now = new Date().toISOString();
-    for (const task of dbTasks) {
+    for (const task of allTasks) {
         const newId = uuidv4();
         idMap.set(task.id, newId);
         const originalDependsOn = (() => {
@@ -54,12 +44,26 @@ export async function handleTaskDuplicate(args) {
             depth: 0,
         });
     }
+    const depthCache = new Map();
+    function computeDepth(taskId) {
+        const cached = depthCache.get(taskId);
+        if (cached !== undefined)
+            return cached;
+        const task = allTasks.find(t => t.id === taskId);
+        if (!task || !task.parent_id) {
+            depthCache.set(taskId, 0);
+            return 0;
+        }
+        const d = 1 + computeDepth(task.parent_id);
+        depthCache.set(taskId, d);
+        return d;
+    }
     for (const task of flatTasks) {
         task.depth = computeDepth(task.old_id);
         task.new_parent_id = task.old_parent_id ? (idMap.get(task.old_parent_id) ?? null) : null;
         task.depends_on = task.original_depends_on_ids
             .map(oldDepId => idMap.get(oldDepId))
-            .filter((id) => !!id);
+            .filter((id) => !!id && id !== task.new_id);
     }
     flatTasks.sort((a, b) => a.depth - b.depth);
     const insertAll = db.transaction((tasks) => {
@@ -69,9 +73,9 @@ export async function handleTaskDuplicate(args) {
         }
     });
     insertAll(flatTasks);
-    return toMCPResponse({
+    return toMCPResponse(TaskDuplicateOutput.parse({
         original_id: input.task_id,
         new_root_id: flatTasks[0].new_id,
         duplicated_count: flatTasks.length,
-    });
+    }));
 }

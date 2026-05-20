@@ -247,12 +247,14 @@ export type TaskImportOutput = z.infer<typeof TaskImportOutput>;
 export const TaskDuplicateInput = z.object({
   task_id: z.string().min(1).describe('ID of the task tree root to duplicate'),
 });
+export type TaskDuplicateInput = z.infer<typeof TaskDuplicateInput>;
 
 export const TaskDuplicateOutput = z.object({
   original_id: z.string().describe('The original task_id that was duplicated'),
   new_root_id: z.string().describe('The new UUID of the duplicated root task'),
   duplicated_count: z.number().describe('Number of tasks cloned (including root)'),
 });
+export type TaskDuplicateOutput = z.infer<typeof TaskDuplicateOutput>;
 
 // ─── tool_export ───
 export const ToolExportInput = z.object({

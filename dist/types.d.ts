@@ -667,6 +667,7 @@ export declare const TaskDuplicateInput: z.ZodObject<{
 }, {
     task_id: string;
 }>;
+export type TaskDuplicateInput = z.infer<typeof TaskDuplicateInput>;
 export declare const TaskDuplicateOutput: z.ZodObject<{
     original_id: z.ZodString;
     new_root_id: z.ZodString;
@@ -680,6 +681,7 @@ export declare const TaskDuplicateOutput: z.ZodObject<{
     new_root_id: string;
     duplicated_count: number;
 }>;
+export type TaskDuplicateOutput = z.infer<typeof TaskDuplicateOutput>;
 export declare const ToolExportInput: z.ZodObject<{
     filepath: z.ZodDefault<z.ZodOptional<z.ZodString>>;
     include_deprecated: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
