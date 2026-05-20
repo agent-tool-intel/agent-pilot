@@ -269,7 +269,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
         required: ['task_ids', 'status'],
       },
-      },
+    },
     {
       name: 'task_dependency_graph',
       description: 'Generate a visual dependency graph of a task tree. Output formats: Mermaid flowchart, ASCII tree, or structured JSON.',

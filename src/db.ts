@@ -42,7 +42,7 @@ function initSchema() {
 
     CREATE TABLE IF NOT EXISTS snapshots (
       id          TEXT PRIMARY KEY,
-      task_id     TEXT NOT NULL,
+      task_id     TEXT NOT NULL REFERENCES tasks(id),
       label       TEXT,
       tree_json   TEXT NOT NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
