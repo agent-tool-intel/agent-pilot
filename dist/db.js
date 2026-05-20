@@ -66,6 +66,29 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_audit_log_task ON audit_log(task_id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log(changed_at);
 
+    CREATE TABLE IF NOT EXISTS archived_tasks (
+      id            TEXT PRIMARY KEY,
+      parent_id     TEXT,
+      title         TEXT NOT NULL,
+      description   TEXT,
+      goal          TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      tool_name     TEXT,
+      result        TEXT,
+      error         TEXT,
+      review_comment TEXT,
+      priority      INTEGER NOT NULL DEFAULT 3,
+      retry_count   INTEGER NOT NULL DEFAULT 0,
+      max_retries   INTEGER NOT NULL DEFAULT 3,
+      depends_on    TEXT NOT NULL DEFAULT '[]',
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      archived_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_archived_tasks_parent ON archived_tasks(parent_id);
+    CREATE INDEX IF NOT EXISTS idx_archived_tasks_status ON archived_tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_archived_tasks_archived ON archived_tasks(archived_at);
+
     CREATE TRIGGER IF NOT EXISTS trg_tasks_status_audit
       AFTER UPDATE OF status ON tasks
       FOR EACH ROW

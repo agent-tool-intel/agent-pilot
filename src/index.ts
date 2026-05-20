@@ -20,6 +20,7 @@ import { handleToolExport } from './tool-export.js';
 import { handleToolImport } from './tool-import.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
 import { handleTaskAuditLog } from './audit-log.js';
+import { handleTaskArchive, handleTaskArchiveList, handleTaskArchiveRestore } from './archiver.js';
 import { handleTaskMetrics } from './metrics.js';
 import { handleTaskRollback } from './rollback.js';
 import { handleSystemInfo } from './system-info.js';
@@ -295,6 +296,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'task_archive',
+      description: 'Archive a completed task tree. Moves the task and its descendants from the active tasks table to the archived_tasks table. Only tasks with status "completed" or "approved" can be archived. Removes associated snapshots and audit log entries.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string', description: 'Task ID to archive' },
+          cascade: { type: 'boolean', description: 'Also archive all descendant tasks (default true)' },
+        },
+        required: ['task_id'],
+      },
+    },
+    {
+      name: 'task_archive_list',
+      description: 'List archived tasks with optional status filter and pagination.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', description: 'Optional status filter' },
+          limit: { type: 'number', description: 'Max results (default 50, max 100)' },
+          offset: { type: 'number', description: 'Offset for pagination (default 0)' },
+        },
+      },
+    },
+    {
+      name: 'task_archive_restore',
+      description: 'Restore an archived task tree back to the active tasks table. Fails if IDs conflict.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string', description: 'Task ID to restore from archive' },
+          cascade: { type: 'boolean', description: 'Also restore all descendant tasks (default true)' },
+        },
+        required: ['task_id'],
+      },
+    },
+    {
       name: 'task_metrics',
       description: 'Aggregate metrics across ALL task trees — total roots, avg completion rate, avg time, most failed titles, avg retries, pending_review vs approved ratio. Read-only.',
       inputSchema: {
@@ -372,6 +409,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'model_route':    return await handleModelRoute(args);
       case 'model_config':   return await handleModelConfig(args);
       case 'task_audit_log': return await handleTaskAuditLog(args);
+      case 'task_archive':        return await handleTaskArchive(args);
+      case 'task_archive_list':   return await handleTaskArchiveList(args);
+      case 'task_archive_restore': return await handleTaskArchiveRestore(args);
       case 'task_metrics':  return await handleTaskMetrics(args);
       case 'task_rollback': return await handleTaskRollback(args);
       case 'task_snapshot': return await handleTaskSnapshot(args);
