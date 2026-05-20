@@ -143,6 +143,11 @@ echo "  Mode: $MODE"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
+# ─── Summary tracking ───
+SUMMARY_FILE="/tmp/build-all-summary.txt"
+echo "FEATURE | NAME | SCORE | ITERATIONS | STATUS | TIME" > "$SUMMARY_FILE"
+PIPELINE_START=$(date +%s)
+
 FEATURES_TO_BUILD=$(get_features)
 STATE=$(load_state)
 COMPLETED=$(echo "$STATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(str(x) for x in d['completed']))" 2>/dev/null || echo "")
@@ -215,17 +220,35 @@ for f in $FEATURES_TO_BUILD; do
     git_commit_feature "$f" "$NAME"
 
     echo ""
-    echo "  ✅ Feature #$f $NAME — PASSED & COMMITTED"
+    # Save summary
+LOOP_LOG=$(ls -t /tmp/devloop-*/iter*-review.txt 2>/dev/null | head -1)
+F_SCORE=$(grep "Final Score:" "$LOOP_LOG" 2>/dev/null | tail -1 | grep -oP "\d+" | head -1)
+F_ITERS=$(grep -c "ITERATION" "$LOOP_LOG" 2>/dev/null || echo "?")
+echo "#$f | $NAME | ${F_SCORE:-?}/100 | ${F_ITERS:-?} | PASSED | $(date +%H:%M)" >> "$SUMMARY_FILE"
+
+echo "  ✅ Feature #$f $NAME — PASSED & COMMITTED"
 
     STATE=$(python3 -c "import json; d=json.loads('$STATE'); d['completed'].append($f); d['current']=None; print(json.dumps(d))")
     save_state "$STATE"
   else
     FAILED_LIST="$FAILED_LIST #$f($NAME)"
     echo ""
-    echo "  ❌ Feature #$f $NAME — FAILED"
+    echo "#$f | $NAME | ?/100 | $MAX_ITERATIONS | FAILED | $(date +%H:%M)" >> "$SUMMARY_FILE"
+echo "  ❌ Feature #$f $NAME — FAILED"
     echo "  Continuing with next feature..."
   fi
 done
+
+# ─── Print Summary Table ───
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  📊 BUILD SUMMARY"
+echo "═══════════════════════════════════════════════════════"
+if [[ -f "$SUMMARY_FILE" ]]; then
+  echo ""
+  column -t -s'|' "$SUMMARY_FILE" 2>/dev/null || cat "$SUMMARY_FILE"
+  echo ""
+fi
 
 # ─── Final Report ───
 echo ""

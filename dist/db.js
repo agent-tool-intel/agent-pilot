@@ -36,6 +36,15 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
+    CREATE TABLE IF NOT EXISTS snapshots (
+      id          TEXT PRIMARY KEY,
+      task_id     TEXT NOT NULL,
+      label       TEXT,
+      tree_json   TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_task ON snapshots(task_id);
+
     CREATE TABLE IF NOT EXISTS tools (
       name        TEXT PRIMARY KEY,
       description TEXT NOT NULL,

@@ -13,6 +13,7 @@ import { handleTaskCancel } from './canceller.js';
 import { handleTaskExport } from './exporter.js';
 import { handleTaskImport } from './importer.js';
 import { handleTaskDuplicate } from './duplicator.js';
+import { handleTaskSnapshot } from './snapshot.js';
 import { handleTaskBatchUpdate } from './batch-updater.js';
 import { handleTaskDependencyGraph } from './dependency-graph.js';
 import { handleToolExport } from './tool-export.js';
@@ -20,6 +21,7 @@ import { handleToolImport } from './tool-import.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
 import { handleTaskAuditLog } from './audit-log.js';
 import { handleTaskMetrics } from './metrics.js';
+import { handleTaskRollback } from './rollback.js';
 
 const server = new Server(
   { name: 'task-orchestrator', version: '0.2.0' },
@@ -298,6 +300,29 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: 'task_rollback',
+      description: 'Roll back a task to its previous status using the audit log. Uses the most recent status change entry. Cannot rollback terminal statuses (completed, cancelled).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string', description: 'Task ID to roll back to its previous status' },
+        },
+        required: ['task_id'],
+      },
+    },
+    {
+      name: 'task_snapshot',
+      description: 'Create a point-in-time snapshot of a task tree. Deep-clones the entire subtree into a snapshots table for versioning and rollback.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string', description: 'Root task ID to snapshot' },
+          label: { type: 'string', description: 'Optional label for this snapshot (e.g. "v1.0", "before-refactor")' },
+        },
+        required: ['task_id'],
+      },
+    },
     ],
 }));
 
@@ -328,6 +353,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'model_config':   return await handleModelConfig(args);
       case 'task_audit_log': return await handleTaskAuditLog(args);
       case 'task_metrics':  return await handleTaskMetrics(args);
+      case 'task_rollback': return await handleTaskRollback(args);
+      case 'task_snapshot': return await handleTaskSnapshot(args);
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
     }

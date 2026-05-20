@@ -293,6 +293,15 @@ export const TaskMetricsOutput = z.object({
         total_completed: z.number(),
     }),
 });
+// ─── task_rollback ───
+export const TaskRollbackInput = z.object({
+    task_id: z.string().min(1).describe('Task ID to roll back to previous status'),
+});
+export const TaskRollbackOutput = z.object({
+    task_id: z.string(),
+    rolled_back_from: z.string(),
+    rolled_back_to: z.string(),
+});
 // ─── 12. task_audit_log ───
 export const TaskAuditLogInput = z.object({
     task_id: z.string().optional().describe('Filter by task ID (optional)'),
@@ -308,6 +317,16 @@ export const TaskAuditLogOutput = z.object({
         changed_at: z.string(),
         metadata: z.string().nullable(),
     })),
+});
+// ─── task_snapshot ───
+export const TaskSnapshotInput = z.object({
+    task_id: z.string().min(1).describe('Root task ID to snapshot'),
+    label: z.string().optional().describe('Optional label for the snapshot'),
+});
+export const TaskSnapshotOutput = z.object({
+    snapshot_id: z.string().describe('UUID of the created snapshot'),
+    task_count: z.number().describe('Number of tasks captured in the tree'),
+    created_at: z.string().describe('ISO-8601 timestamp of snapshot creation'),
 });
 // ─── MCP response helper ───
 export function toMCPResponse(data) {

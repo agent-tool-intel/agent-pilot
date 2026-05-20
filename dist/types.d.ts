@@ -959,6 +959,28 @@ export declare const TaskMetricsOutput: z.ZodObject<{
     };
 }>;
 export type TaskMetricsOutput = z.infer<typeof TaskMetricsOutput>;
+export declare const TaskRollbackInput: z.ZodObject<{
+    task_id: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    task_id: string;
+}, {
+    task_id: string;
+}>;
+export type TaskRollbackInput = z.infer<typeof TaskRollbackInput>;
+export declare const TaskRollbackOutput: z.ZodObject<{
+    task_id: z.ZodString;
+    rolled_back_from: z.ZodString;
+    rolled_back_to: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    task_id: string;
+    rolled_back_from: string;
+    rolled_back_to: string;
+}, {
+    task_id: string;
+    rolled_back_from: string;
+    rolled_back_to: string;
+}>;
+export type TaskRollbackOutput = z.infer<typeof TaskRollbackOutput>;
 export interface TaskRow {
     id: string;
     parent_id: string | null;
@@ -1053,6 +1075,31 @@ export interface AuditLogRow {
     changed_at: string;
     metadata: string | null;
 }
+export declare const TaskSnapshotInput: z.ZodObject<{
+    task_id: z.ZodString;
+    label: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    task_id: string;
+    label?: string | undefined;
+}, {
+    task_id: string;
+    label?: string | undefined;
+}>;
+export type TaskSnapshotInput = z.infer<typeof TaskSnapshotInput>;
+export declare const TaskSnapshotOutput: z.ZodObject<{
+    snapshot_id: z.ZodString;
+    task_count: z.ZodNumber;
+    created_at: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    created_at: string;
+    task_count: number;
+    snapshot_id: string;
+}, {
+    created_at: string;
+    task_count: number;
+    snapshot_id: string;
+}>;
+export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
 export declare function toMCPResponse(data: unknown): {
     content: {
         type: "text";

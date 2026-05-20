@@ -40,7 +40,7 @@
 |---|---------|--------|------|
 | 19 | task_audit_log — full state change history (SQLite triggers) | ⬜ pending | 🟢🟢 Strong |
 | 20 | task_metrics — aggregate stats across all task trees | ⬜ pending | 🟢 Data Query |
-| 21 | task_rollback — revert task to previous state via audit log | ⬜ pending | 🟢🟢 Strong |
+| 21 | task_rollback — revert task to previous state via audit log | ✅ done | 🟢🟢 Strong |
 
 ## Phase 5.5: Model Router Integration 🆕
 | # | Feature | Status | Moat |

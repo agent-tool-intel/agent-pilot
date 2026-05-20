@@ -360,6 +360,19 @@ export const TaskMetricsOutput = z.object({
 });
 export type TaskMetricsOutput = z.infer<typeof TaskMetricsOutput>;
 
+// ─── task_rollback ───
+export const TaskRollbackInput = z.object({
+  task_id: z.string().min(1).describe('Task ID to roll back to previous status'),
+});
+export type TaskRollbackInput = z.infer<typeof TaskRollbackInput>;
+
+export const TaskRollbackOutput = z.object({
+  task_id: z.string(),
+  rolled_back_from: z.string(),
+  rolled_back_to: z.string(),
+});
+export type TaskRollbackOutput = z.infer<typeof TaskRollbackOutput>;
+
 // ─── DB row types ───
 export interface TaskRow {
   id: string;
@@ -418,6 +431,20 @@ export interface AuditLogRow {
   changed_at: string;
   metadata: string | null;
 }
+
+// ─── task_snapshot ───
+export const TaskSnapshotInput = z.object({
+  task_id: z.string().min(1).describe('Root task ID to snapshot'),
+  label: z.string().optional().describe('Optional label for the snapshot'),
+});
+export type TaskSnapshotInput = z.infer<typeof TaskSnapshotInput>;
+
+export const TaskSnapshotOutput = z.object({
+  snapshot_id: z.string().describe('UUID of the created snapshot'),
+  task_count: z.number().describe('Number of tasks captured in the tree'),
+  created_at: z.string().describe('ISO-8601 timestamp of snapshot creation'),
+});
+export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
 
 // ─── MCP response helper ───
 export function toMCPResponse(data: unknown) {
