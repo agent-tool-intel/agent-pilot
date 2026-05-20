@@ -11,12 +11,6 @@ export declare function handleToolUpdate(args: unknown): Promise<{
         type: "text";
         text: string;
     }[];
-} | {
-    content: {
-        type: string;
-        text: string;
-    }[];
-    isError: boolean;
 }>;
 export declare function handleToolSearch(args: unknown): Promise<{
     isError?: boolean | undefined;
@@ -31,12 +25,6 @@ export declare function handleToolDeprecate(args: unknown): Promise<{
         type: "text";
         text: string;
     }[];
-} | {
-    content: {
-        type: string;
-        text: string;
-    }[];
-    isError: boolean;
 }>;
 export declare function handleToolStats(_args: unknown): Promise<{
     isError?: boolean | undefined;

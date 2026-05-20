@@ -153,6 +153,7 @@ export type ToolRegisterInput = z.infer<typeof ToolRegisterInput>;
 export const ToolRegisterOutput = z.object({
   name: z.string(),
   description: z.string(),
+  schema: z.string(),
   provider: z.string(),
   tags: z.array(z.string()),
   created_at: z.string(),
@@ -162,8 +163,8 @@ export const ToolRegisterOutput = z.object({
 export const ToolUpdateInput = z.object({
   name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name to update (snake_case)'),
   description: z.string().min(1).optional().describe('New description'),
-  schema: z.string().optional().describe('New JSON Schema string'),
-  provider: z.string().optional().describe('New provider'),
+  schema: z.string().min(1).optional().describe('New JSON Schema string'),
+  provider: z.string().min(1).optional().describe('New provider'),
   tags: z.array(z.string()).optional().describe('New tags for searchability'),
 });
 export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;

@@ -464,6 +464,7 @@ export type ToolRegisterInput = z.infer<typeof ToolRegisterInput>;
 export declare const ToolRegisterOutput: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodString;
+    schema: z.ZodString;
     provider: z.ZodString;
     tags: z.ZodArray<z.ZodString, "many">;
     created_at: z.ZodString;
@@ -471,12 +472,14 @@ export declare const ToolRegisterOutput: z.ZodObject<{
     description: string;
     created_at: string;
     name: string;
+    schema: string;
     provider: string;
     tags: string[];
 }, {
     description: string;
     created_at: string;
     name: string;
+    schema: string;
     provider: string;
     tags: string[];
 }>;

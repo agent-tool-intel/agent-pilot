@@ -21,6 +21,7 @@ export async function handleToolRegister(args: unknown) {
   return toMCPResponse({
     name: input.name,
     description: input.description,
+    schema: input.schema,
     provider: input.provider,
     tags: input.tags,
     created_at: now,
@@ -33,7 +34,7 @@ export async function handleToolUpdate(args: unknown) {
 
   const existing = db.prepare('SELECT * FROM tools WHERE name = ?').get(input.name) as ToolRow | undefined;
   if (!existing) {
-    return { content: [{ type: 'text', text: JSON.stringify({ error: 'Tool not found: ' + input.name }) }], isError: true };
+    return toMCPResponse({ error: 'Tool not found: ' + input.name });
   }
 
   const description = input.description ?? existing.description;
@@ -45,18 +46,15 @@ export async function handleToolUpdate(args: unknown) {
     'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(input.name, description, schema, provider, tags.join(','), existing.created_at);
 
-  const searchableChanged = input.description !== undefined || input.tags !== undefined;
-  if (searchableChanged) {
-    try {
-      db.prepare(
-        'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
-      ).run(input.name);
-      db.prepare(
-        'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
-      ).run(input.name, description, tags.join(','));
-    } catch {
-      // FTS5 not available
-    }
+  try {
+    db.prepare(
+      'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+    ).run(input.name);
+    db.prepare(
+      'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+    ).run(input.name, description, tags.join(','));
+  } catch {
+    // FTS5 not available
   }
 
   return toMCPResponse({
@@ -128,7 +126,7 @@ export async function handleToolDeprecate(args: unknown) {
 
   const existing = db.prepare('SELECT * FROM tools WHERE name = ?').get(input.name) as ToolRow | undefined;
   if (!existing) {
-    return { content: [{ type: 'text', text: JSON.stringify({ error: 'Tool not found: ' + input.name }) }], isError: true };
+    return toMCPResponse({ error: 'Tool not found: ' + input.name });
   }
 
   const deprecationPrefix = '[DEPRECATED]';
