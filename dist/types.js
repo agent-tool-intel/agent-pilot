@@ -334,6 +334,11 @@ export const TaskSnapshotOutput = z.object({
     task_count: z.number().describe('Number of tasks captured in the tree'),
     created_at: z.string().describe('ISO-8601 timestamp of snapshot creation'),
 });
+// ─── data_integrity_check ───
+export const DataIntegrityCheckInput = z.object({
+    repair: z.boolean().optional().default(false)
+        .describe('If true, auto-repair fixable issues'),
+});
 // ─── MCP response helper — auto-detects error responses ───
 export function toMCPResponse(data, isError = false) {
     const hasError = isError || (typeof data === 'object' && data !== null && 'error' in data);

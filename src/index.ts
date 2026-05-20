@@ -23,6 +23,7 @@ import { handleTaskAuditLog } from './audit-log.js';
 import { handleTaskMetrics } from './metrics.js';
 import { handleTaskRollback } from './rollback.js';
 import { handleSystemInfo } from './system-info.js';
+import { handleDataIntegrityCheck } from './integrity.js';
 
 const server = new Server(
   { name: 'task-orchestrator', version: '0.2.0' },
@@ -332,6 +333,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: 'data_integrity_check',
+      description: 'Scan database for orphans, broken refs, and inconsistent states. Optionally auto-repair.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          repair: { type: 'boolean', description: 'Auto-repair fixable issues (default: false)' },
+        },
+      },
+    },
     ],
 }));
 
@@ -365,6 +376,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'task_rollback': return await handleTaskRollback(args);
       case 'task_snapshot': return await handleTaskSnapshot(args);
       case 'system_info':  return await handleSystemInfo(args);
+      case 'data_integrity_check': return await handleDataIntegrityCheck(args);
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
     }

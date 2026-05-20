@@ -456,6 +456,19 @@ export const TaskSnapshotOutput = z.object({
 });
 export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
 
+// ─── data_integrity_check ───
+export const DataIntegrityCheckInput = z.object({
+  repair: z.boolean().optional().default(false)
+    .describe('If true, auto-repair fixable issues'),
+});
+export type DataIntegrityCheckInput = z.infer<typeof DataIntegrityCheckInput>;
+
+export interface IntegrityIssue {
+  type: string;
+  task_id?: string;
+  description: string;
+}
+
 // ─── MCP response helper — auto-detects error responses ───
 export function toMCPResponse(data: unknown, isError = false) {
   const hasError = isError || (typeof data === 'object' && data !== null && 'error' in (data as Record<string, unknown>));

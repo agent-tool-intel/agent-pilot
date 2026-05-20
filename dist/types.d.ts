@@ -1116,6 +1116,19 @@ export declare const TaskSnapshotOutput: z.ZodObject<{
     snapshot_id: string;
 }>;
 export type TaskSnapshotOutput = z.infer<typeof TaskSnapshotOutput>;
+export declare const DataIntegrityCheckInput: z.ZodObject<{
+    repair: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+}, "strip", z.ZodTypeAny, {
+    repair: boolean;
+}, {
+    repair?: boolean | undefined;
+}>;
+export type DataIntegrityCheckInput = z.infer<typeof DataIntegrityCheckInput>;
+export interface IntegrityIssue {
+    type: string;
+    task_id?: string;
+    description: string;
+}
 export declare function toMCPResponse(data: unknown, isError?: boolean): {
     isError?: boolean | undefined;
     content: {
