@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../data/orchestrator.db');
+export const DB_PATH = path.resolve(__dirname, '../data/orchestrator.db');
 
 let db: Database.Database | null = null;
 

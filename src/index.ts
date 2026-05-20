@@ -22,6 +22,7 @@ import { handleModelClassify, handleModelRoute, handleModelConfig } from './mode
 import { handleTaskAuditLog } from './audit-log.js';
 import { handleTaskMetrics } from './metrics.js';
 import { handleTaskRollback } from './rollback.js';
+import { handleSystemInfo } from './system-info.js';
 
 const server = new Server(
   { name: 'task-orchestrator', version: '0.2.0' },
@@ -323,6 +324,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['task_id'],
       },
     },
+    {
+      name: 'system_info',
+      description: 'Get database infrastructure statistics: table row counts, database file size, WAL status, and server version. Read-only introspection.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
     ],
 }));
 
@@ -355,6 +364,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'task_metrics':  return await handleTaskMetrics(args);
       case 'task_rollback': return await handleTaskRollback(args);
       case 'task_snapshot': return await handleTaskSnapshot(args);
+      case 'system_info':  return await handleSystemInfo(args);
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
     }
