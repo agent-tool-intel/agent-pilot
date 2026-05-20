@@ -680,6 +680,28 @@ export declare const TaskDuplicateOutput: z.ZodObject<{
     new_root_id: string;
     duplicated_count: number;
 }>;
+export declare const ToolExportInput: z.ZodObject<{
+    filepath: z.ZodDefault<z.ZodOptional<z.ZodString>>;
+    include_deprecated: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
+}, "strip", z.ZodTypeAny, {
+    filepath: string;
+    include_deprecated: boolean;
+}, {
+    filepath?: string | undefined;
+    include_deprecated?: boolean | undefined;
+}>;
+export type ToolExportInput = z.infer<typeof ToolExportInput>;
+export declare const ToolExportOutput: z.ZodObject<{
+    exported_to: z.ZodString;
+    tool_count: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    exported_to: string;
+    tool_count: number;
+}, {
+    exported_to: string;
+    tool_count: number;
+}>;
+export type ToolExportOutput = z.infer<typeof ToolExportOutput>;
 export declare const TaskBatchUpdateInput: z.ZodObject<{
     task_ids: z.ZodArray<z.ZodString, "many">;
     status: z.ZodEnum<["in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;

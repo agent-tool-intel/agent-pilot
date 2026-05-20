@@ -15,6 +15,7 @@ import { handleTaskImport } from './importer.js';
 import { handleTaskDuplicate } from './duplicator.js';
 import { handleTaskBatchUpdate } from './batch-updater.js';
 import { handleTaskDependencyGraph } from './dependency-graph.js';
+import { handleToolExport } from './tool-export.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
 
 const server = new Server(
@@ -162,6 +163,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'tool_export',
+      description: 'Export all registered tools to a JSON file. Optionally include deprecated tools.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filepath: { type: 'string', description: 'Output file path (default: /tmp/tools_export.json)' },
+          include_deprecated: { type: 'boolean', description: 'Include deprecated tools (default: false)' },
+        },
+      },
+    },
+    {
       name: 'task_cancel',
       description: 'Cancel a task and optionally all its descendants. Only cancellable: pending, in_progress, failed, blocked.',
       inputSchema: {
@@ -260,6 +272,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'tool_search':   return await handleToolSearch(args);
       case 'tool_update':   return await handleToolUpdate(args);
       case 'tool_deprecate': return await handleToolDeprecate(args);
+      case 'tool_export':   return await handleToolExport(args);
       case 'task_cancel':   return await handleTaskCancel(args);
       case 'task_export':   return await handleTaskExport(args);
       case 'task_import':   return await handleTaskImport(args);

@@ -254,6 +254,21 @@ export const TaskDuplicateOutput = z.object({
   duplicated_count: z.number().describe('Number of tasks cloned (including root)'),
 });
 
+// ─── tool_export ───
+export const ToolExportInput = z.object({
+  filepath: z.string().optional().default('/tmp/tools_export.json')
+    .describe('Output file path for the JSON export'),
+  include_deprecated: z.boolean().optional().default(false)
+    .describe('Whether to include deprecated tools'),
+});
+export type ToolExportInput = z.infer<typeof ToolExportInput>;
+
+export const ToolExportOutput = z.object({
+  exported_to: z.string(),
+  tool_count: z.number(),
+});
+export type ToolExportOutput = z.infer<typeof ToolExportOutput>;
+
 // ─── 11. task_batch_update ───
 export const TaskBatchUpdateInput = z.object({
   task_ids: z.array(z.string()).min(1).describe('Array of task IDs to update'),
