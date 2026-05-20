@@ -895,6 +895,73 @@ export interface ToolRow {
     created_at: string;
     relevance_score?: number;
 }
+export declare const TaskAuditLogInput: z.ZodObject<{
+    task_id: z.ZodOptional<z.ZodString>;
+    limit: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+}, "strip", z.ZodTypeAny, {
+    limit: number;
+    task_id?: string | undefined;
+}, {
+    task_id?: string | undefined;
+    limit?: number | undefined;
+}>;
+export type TaskAuditLogInput = z.infer<typeof TaskAuditLogInput>;
+export declare const TaskAuditLogOutput: z.ZodObject<{
+    entries: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        task_id: z.ZodString;
+        old_status: z.ZodNullable<z.ZodString>;
+        new_status: z.ZodString;
+        changed_by: z.ZodString;
+        changed_at: z.ZodString;
+        metadata: z.ZodNullable<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        id: string;
+        task_id: string;
+        old_status: string | null;
+        new_status: string;
+        changed_by: string;
+        changed_at: string;
+        metadata: string | null;
+    }, {
+        id: string;
+        task_id: string;
+        old_status: string | null;
+        new_status: string;
+        changed_by: string;
+        changed_at: string;
+        metadata: string | null;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    entries: {
+        id: string;
+        task_id: string;
+        old_status: string | null;
+        new_status: string;
+        changed_by: string;
+        changed_at: string;
+        metadata: string | null;
+    }[];
+}, {
+    entries: {
+        id: string;
+        task_id: string;
+        old_status: string | null;
+        new_status: string;
+        changed_by: string;
+        changed_at: string;
+        metadata: string | null;
+    }[];
+}>;
+export interface AuditLogRow {
+    id: string;
+    task_id: string;
+    old_status: string | null;
+    new_status: string;
+    changed_by: string;
+    changed_at: string;
+    metadata: string | null;
+}
 export declare function toMCPResponse(data: unknown): {
     content: {
         type: "text";

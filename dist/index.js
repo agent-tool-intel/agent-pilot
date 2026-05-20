@@ -15,6 +15,7 @@ import { handleTaskDependencyGraph } from './dependency-graph.js';
 import { handleToolExport } from './tool-export.js';
 import { handleToolImport } from './tool-import.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
+import { handleTaskAuditLog } from './audit-log.js';
 const server = new Server({ name: 'task-orchestrator', version: '0.2.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
@@ -269,6 +270,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 },
             },
         },
+        {
+            name: 'task_audit_log',
+            description: 'Retrieve task status change audit trail. Optionally filter by task_id.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    task_id: { type: 'string', description: 'Filter by task ID (optional)' },
+                    limit: { type: 'number', description: 'Max entries (default 50, max 500)' },
+                },
+            },
+        },
     ],
 }));
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -296,6 +308,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case 'model_classify': return await handleModelClassify(args);
             case 'model_route': return await handleModelRoute(args);
             case 'model_config': return await handleModelConfig(args);
+            case 'task_audit_log': return await handleTaskAuditLog(args);
             default:
                 return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
         }

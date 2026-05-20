@@ -363,6 +363,35 @@ export interface ToolRow {
   relevance_score?: number;
 }
 
+// ─── 12. task_audit_log ───
+export const TaskAuditLogInput = z.object({
+  task_id: z.string().optional().describe('Filter by task ID (optional)'),
+  limit: z.number().int().min(1).max(500).optional().default(50).describe('Max entries (default 50, max 500)'),
+});
+export type TaskAuditLogInput = z.infer<typeof TaskAuditLogInput>;
+
+export const TaskAuditLogOutput = z.object({
+  entries: z.array(z.object({
+    id: z.string(),
+    task_id: z.string(),
+    old_status: z.string().nullable(),
+    new_status: z.string(),
+    changed_by: z.string(),
+    changed_at: z.string(),
+    metadata: z.string().nullable(),
+  })),
+});
+
+export interface AuditLogRow {
+  id: string;
+  task_id: string;
+  old_status: string | null;
+  new_status: string;
+  changed_by: string;
+  changed_at: string;
+  metadata: string | null;
+}
+
 // ─── MCP response helper ───
 export function toMCPResponse(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };

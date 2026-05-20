@@ -48,6 +48,33 @@ function initSchema() {
       tags        TEXT NOT NULL DEFAULT '',
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id         TEXT PRIMARY KEY,
+      task_id    TEXT NOT NULL,
+      old_status TEXT,
+      new_status TEXT NOT NULL,
+      changed_by TEXT NOT NULL DEFAULT 'system',
+      changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      metadata   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_task ON audit_log(task_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log(changed_at);
+
+    CREATE TRIGGER IF NOT EXISTS trg_tasks_status_audit
+      AFTER UPDATE OF status ON tasks
+      FOR EACH ROW
+    BEGIN
+      INSERT INTO audit_log (id, task_id, old_status, new_status)
+      VALUES (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-4' ||
+        lower(hex(randomblob(2))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        lower(hex(randomblob(6))),
+        OLD.id, OLD.status, NEW.status
+      );
+    END;
   `);
 
   // Add review_comment column if upgrading from v0.1.0
