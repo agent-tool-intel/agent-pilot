@@ -19,6 +19,7 @@ import { handleToolExport } from './tool-export.js';
 import { handleToolImport } from './tool-import.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
 import { handleTaskAuditLog } from './audit-log.js';
+import { handleTaskMetrics } from './metrics.js';
 
 const server = new Server(
   { name: 'task-orchestrator', version: '0.2.0' },
@@ -289,6 +290,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: 'task_metrics',
+      description: 'Aggregate metrics across ALL task trees — total roots, avg completion rate, avg time, most failed titles, avg retries, pending_review vs approved ratio. Read-only.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
     ],
 }));
 
@@ -318,6 +327,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'model_route':    return await handleModelRoute(args);
       case 'model_config':   return await handleModelConfig(args);
       case 'task_audit_log': return await handleTaskAuditLog(args);
+      case 'task_metrics':  return await handleTaskMetrics(args);
       default:
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
     }

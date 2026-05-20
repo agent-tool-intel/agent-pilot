@@ -268,6 +268,31 @@ export const ToolStatsOutput = z.object({
         created_at: z.string(),
     })),
 });
+// ─── task_metrics ───
+export const TaskMetricsOutput = z.object({
+    total_roots: z.number(),
+    total_tasks: z.number(),
+    avg_completion_rate: z.number().nullable(),
+    avg_completion_time_days: z.number().nullable(),
+    most_failed_titles: z.array(z.object({
+        title: z.string(),
+        failures: z.number(),
+    })),
+    avg_retries: z.number(),
+    pending_review_count: z.number(),
+    approved_count: z.number(),
+    pending_review_vs_approved_ratio: z.number().nullable(),
+    status_breakdown: z.array(z.object({
+        status: z.string(),
+        count: z.number(),
+    })),
+    tree_count: z.number(),
+    tree_summary: z.object({
+        avg_tree_size: z.number(),
+        total_failed: z.number(),
+        total_completed: z.number(),
+    }),
+});
 // ─── 12. task_audit_log ───
 export const TaskAuditLogInput = z.object({
     task_id: z.string().optional().describe('Filter by task ID (optional)'),

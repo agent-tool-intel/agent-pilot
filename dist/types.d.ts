@@ -868,6 +868,97 @@ export declare const ToolStatsOutput: z.ZodObject<{
     }[];
 }>;
 export type ToolStatsOutput = z.infer<typeof ToolStatsOutput>;
+export declare const TaskMetricsOutput: z.ZodObject<{
+    total_roots: z.ZodNumber;
+    total_tasks: z.ZodNumber;
+    avg_completion_rate: z.ZodNullable<z.ZodNumber>;
+    avg_completion_time_days: z.ZodNullable<z.ZodNumber>;
+    most_failed_titles: z.ZodArray<z.ZodObject<{
+        title: z.ZodString;
+        failures: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        title: string;
+        failures: number;
+    }, {
+        title: string;
+        failures: number;
+    }>, "many">;
+    avg_retries: z.ZodNumber;
+    pending_review_count: z.ZodNumber;
+    approved_count: z.ZodNumber;
+    pending_review_vs_approved_ratio: z.ZodNullable<z.ZodNumber>;
+    status_breakdown: z.ZodArray<z.ZodObject<{
+        status: z.ZodString;
+        count: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        status: string;
+        count: number;
+    }, {
+        status: string;
+        count: number;
+    }>, "many">;
+    tree_count: z.ZodNumber;
+    tree_summary: z.ZodObject<{
+        avg_tree_size: z.ZodNumber;
+        total_failed: z.ZodNumber;
+        total_completed: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        avg_tree_size: number;
+        total_failed: number;
+        total_completed: number;
+    }, {
+        avg_tree_size: number;
+        total_failed: number;
+        total_completed: number;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    total_roots: number;
+    total_tasks: number;
+    avg_completion_rate: number | null;
+    avg_completion_time_days: number | null;
+    most_failed_titles: {
+        title: string;
+        failures: number;
+    }[];
+    avg_retries: number;
+    pending_review_count: number;
+    approved_count: number;
+    pending_review_vs_approved_ratio: number | null;
+    status_breakdown: {
+        status: string;
+        count: number;
+    }[];
+    tree_count: number;
+    tree_summary: {
+        avg_tree_size: number;
+        total_failed: number;
+        total_completed: number;
+    };
+}, {
+    total_roots: number;
+    total_tasks: number;
+    avg_completion_rate: number | null;
+    avg_completion_time_days: number | null;
+    most_failed_titles: {
+        title: string;
+        failures: number;
+    }[];
+    avg_retries: number;
+    pending_review_count: number;
+    approved_count: number;
+    pending_review_vs_approved_ratio: number | null;
+    status_breakdown: {
+        status: string;
+        count: number;
+    }[];
+    tree_count: number;
+    tree_summary: {
+        avg_tree_size: number;
+        total_failed: number;
+        total_completed: number;
+    };
+}>;
+export type TaskMetricsOutput = z.infer<typeof TaskMetricsOutput>;
 export interface TaskRow {
     id: string;
     parent_id: string | null;
