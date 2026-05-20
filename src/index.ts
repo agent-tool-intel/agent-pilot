@@ -380,6 +380,45 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: 'model_classify',
+      description: 'Classify a task description into one of 8 categories using keyword-based rule engine (zero LLM). Returns category, confidence, matched keywords, and all category scores.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_description: { type: 'string', description: 'Task description to classify' },
+        },
+        required: ['task_description'],
+      },
+    },
+    {
+      name: 'model_route',
+      description: 'Route a task to the best model based on its classification and available models for the active plan.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          task_description: { type: 'string', description: 'Task description to route' },
+          available_models: { type: 'array', items: { type: 'string' }, description: 'Available model IDs (optional)' },
+          plan_preset: { type: 'string', enum: ['A', 'B', 'C'], description: 'Plan preset (default B)' },
+        },
+        required: ['task_description'],
+      },
+    },
+    {
+      name: 'model_config',
+      description: 'Manage model routing configuration: list, switch plan, set overrides, or reset to defaults.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['list', 'switch', 'set', 'reset'], description: 'Action to perform' },
+          plan: { type: 'string', enum: ['A', 'B', 'C'], description: 'Plan preset' },
+          category: { type: 'string', description: 'Category name (for set)' },
+          primary_model: { type: 'string', description: 'Primary model ID (for set)' },
+          fallback_model: { type: 'string', description: 'Fallback model ID (for set)' },
+        },
+        required: ['action'],
+      },
+    },
     ],
 }));
 

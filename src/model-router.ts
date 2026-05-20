@@ -190,10 +190,20 @@ function classify(taskDescription: string): {
         return {
           category: cat, category_name: rule.name, confidence: 0.5,
           matched_keywords: [key],
-          all_scores: scores,
+          all_scores: scores.map(s => ({ ...s, score: Math.round(s.score * 100) / 100 })),
         };
       }
     }
+
+    // Ultimate fallback to high_logic
+    const defaultRule = CATEGORY_RULES['high_logic'];
+    return {
+      category: 'high_logic',
+      category_name: defaultRule.name,
+      confidence: 0.3,
+      matched_keywords: [],
+      all_scores: scores.map(s => ({ ...s, score: Math.round(s.score * 100) / 100 })),
+    };
   }
 
   return {
