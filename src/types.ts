@@ -165,7 +165,7 @@ export const ToolUpdateInput = z.object({
   description: z.string().min(1).optional().describe('New description'),
   schema: z.string().min(1).optional().describe('New JSON Schema string'),
   provider: z.string().min(1).optional().describe('New provider'),
-  tags: z.array(z.string()).optional().describe('New tags for searchability'),
+  tags: z.array(z.string().min(1)).optional().describe('New tags for searchability'),
 });
 export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;
 

@@ -1,5 +1,5 @@
 import { getDb } from './db.js';
-import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
+import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
 
 export async function handleToolRegister(args: unknown) {
   const input = ToolRegisterInput.parse(args);
@@ -41,30 +41,40 @@ export async function handleToolUpdate(args: unknown) {
   const schema = input.schema ?? existing.schema;
   const provider = input.provider ?? existing.provider;
   const tags = input.tags ?? (existing.tags || '').split(',').filter(Boolean);
+  const sortedTags = [...tags].sort();
 
-  db.prepare(
-    'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(input.name, description, schema, provider, tags.join(','), existing.created_at);
+  const descChanged = description !== existing.description;
+  const existingTagsSorted = (existing.tags || '').split(',').filter(Boolean).sort();
+  const tagsChanged = sortedTags.join(',') !== existingTagsSorted.join(',');
 
-  try {
+  const write = db.transaction(() => {
     db.prepare(
-      'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
-    ).run(input.name);
-    db.prepare(
-      'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
-    ).run(input.name, description, tags.join(','));
-  } catch {
-    // FTS5 not available
-  }
+      'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
+    ).run(description, schema, provider, sortedTags.join(','), input.name);
 
-  return toMCPResponse({
+    if (descChanged || tagsChanged) {
+      try {
+        db.prepare(
+          'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+        ).run(input.name);
+        db.prepare(
+          'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+        ).run(input.name, input.name, description, sortedTags.join(','));
+      } catch {
+        // FTS5 not available
+      }
+    }
+  });
+  write();
+
+  return toMCPResponse(ToolUpdateOutput.parse({
     name: input.name,
     description,
     schema,
     provider,
-    tags,
+    tags: sortedTags,
     created_at: existing.created_at,
-  });
+  }));
 }
 
 export async function handleToolSearch(args: unknown) {
