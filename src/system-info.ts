@@ -32,17 +32,18 @@ export async function handleSystemInfo(_args: unknown) {
 
   let walCheckpointPages: number | null = null;
   try {
-    const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as unknown as Record<string, unknown>[];
+    const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as { busy: number; log: number; checkpointed: number }[];
     if (checkpointRows && checkpointRows.length > 0) {
       const row = checkpointRows[0];
-      walCheckpointPages = Number(row['checkpointed'] ?? row['log'] ?? row['busy'] ?? 0);
+      walCheckpointPages = Number(row.checkpointed ?? row.log ?? row.busy ?? 0);
     }
-  } catch {
+  } catch (err) {
+    console.error('WAL checkpoint query failed:', err);
     walCheckpointPages = null;
   }
 
   const tables = db.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%\\_fts%' ESCAPE '\\' ORDER BY name"
   ).all() as { name: string }[];
 
   const tableRowCounts: Record<string, number> = {};
