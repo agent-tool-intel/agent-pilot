@@ -1,0 +1,62 @@
+{
+  "plan_name": "Plan C - GLM Lazy Mode (Updated 2026-05-20)",
+  "description": "純GLM模型套餐，一個GLM Coding Plan走天涯。適合唔想折騰嘅用家。",
+  "plan_type": "lazy_mode",
+  "concept": "懶人模式：全部用智譜GLM系列，根據工作複雜度自動匹配型號",
+  "routing_rule": "complexity_based",
+  "default_fallback": "zhipu/glm-5-1",
+  "task_models": {
+    "high_logic": {
+      "primary": "zhipu/glm-5-1",
+      "fallback": "zhipu/glm-5",
+      "reason": "GLM-5.1 最新旗艦推理"
+    },
+    "code_generation": {
+      "primary": "zhipu/glm-5-1",
+      "fallback": "zhipu/glm-5",
+      "reason": "GLM-5.1 編程SOTA開源"
+    },
+    "creative_writing": {
+      "primary": "zhipu/glm-5-1",
+      "fallback": "zhipu/glm-5",
+      "reason": "GLM-5.1 創意寫作能力強"
+    },
+    "info_reading": {
+      "primary": "zhipu/glm-4-flash",
+      "fallback": "zhipu/glm-5-1",
+      "reason": "GLM-4-Flash 快速+便宜，128K context"
+    },
+    "simple_repeat": {
+      "primary": "zhipu/glm-4-flash",
+      "fallback": "zhipu/glm-5-1",
+      "reason": "GLM-4-Flash 超快推理，高並發"
+    },
+    "image_understanding": {
+      "primary": "zhipu/glm-4-6v",
+      "fallback": "zhipu/glm-4v-flash",
+      "reason": "GLM-4.6V 視覺旗艦"
+    },
+    "image_generation": {
+      "primary": "zhipu/cogview4",
+      "fallback": "zhipu/glm-image",
+      "reason": "CogView4 首個支援漢字生成"
+    },
+    "video_audio": {
+      "primary": "zhipu/glm-4-voice",
+      "fallback": "zhipu/glm-4-vision",
+      "reason": "GLM-4-Voice 粵語/方言支援"
+    }
+  },
+  "model_mapping": {
+    "text": { "flagship": "glm-5-1", "standard": "glm-5", "fast": "glm-4-flash" },
+    "vision": { "flagship": "glm-4-6v", "thinking": "glm-4-1v-thinking", "fast": "glm-4v-flash" },
+    "image": { "flagship": "cogview4", "commercial": "glm-image" },
+    "audio": { "voice": "glm-4-voice" }
+  },
+  "auto_switch": {
+    "enabled": true,
+    "description": "根據工作複雜度自動選擇合適GLM型號",
+    "rules": { "quick_task": "glm-4-flash", "standard_task": "glm-5", "complex_task": "glm-5-1" }
+  },
+  "fallback": { "unknown_task": "glm-5-1", "unknown_model": "glm-4-flash" }
+}

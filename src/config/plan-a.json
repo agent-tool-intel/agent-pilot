@@ -1,0 +1,57 @@
+{
+  "plan_name": "Plan A - International Models (Updated 2026-05-20)",
+  "description": "國際模型套餐。簡單task用平model，複雜task用強model。整體成本控制喺混合使用嘅30-50%。",
+  "cost_strategy": "旗艦模型做複雜推理+代碼，廉價模型做閱讀+重複任務",
+  "routing_rule": "complexity_based",
+  "default_fallback": "anthropic/claude-sonnet-4-6",
+  "task_models": {
+    "high_logic": {
+      "primary": "anthropic/claude-opus-4-7",
+      "fallback": "anthropic/claude-sonnet-4-6",
+      "cost_per_1M_output": "$75.00 / $15.00",
+      "reason": "Opus 4.7 最強推理，Sonnet 4.6 做 fallback 性價比高"
+    },
+    "code_generation": {
+      "primary": "anthropic/claude-sonnet-4-6",
+      "fallback": "openai/gpt-5-4",
+      "cost_per_1M_output": "$15.00 / $15.00",
+      "reason": "Sonnet 4.6 SWE-bench 79.6%，GPT-5.4 80.0%"
+    },
+    "creative_writing": {
+      "primary": "minimax/minimax-m2-5",
+      "fallback": "anthropic/claude-sonnet-4-6",
+      "cost_per_1M_output": "$1.20 / $15.00",
+      "reason": "MiniMax M2.5 創意寫作專項強，成本只係 Claude 嘅 1/12"
+    },
+    "info_reading": {
+      "primary": "google/gemini-2-5-flash-lite",
+      "fallback": "deepseek/deepseek-v4-flash",
+      "cost_per_1M_output": "$0.40 / $0.28",
+      "reason": "極平成本，1M context，足夠閱讀長文"
+    },
+    "simple_repeat": {
+      "primary": "deepseek/deepseek-v4-flash",
+      "fallback": "google/gemini-2-5-flash-lite",
+      "cost_per_1M_output": "$0.28 / $0.40",
+      "reason": "DeepSeek V4-Flash 全球最低價"
+    },
+    "image_understanding": {
+      "primary": "anthropic/claude-sonnet-4-6",
+      "fallback": "google/gemini-3-1-pro",
+      "cost_per_1M_output": "$15.00 / $12.00",
+      "reason": "Claude Sonnet 4.6 視覺理解最強"
+    },
+    "image_generation": {
+      "primary": "openai/dall-e-4",
+      "fallback": "stability/stable-diffusion-4",
+      "cost_per_image": "~$0.04-0.12",
+      "reason": "DALL-E 4 最新版本"
+    },
+    "video_audio": {
+      "primary": "google/gemini-3-1-pro",
+      "fallback": "openai/gpt-5-4",
+      "cost_per_1M_output": "$12.00 / $15.00",
+      "reason": "Gemini 3.1 Pro 原生視頻理解"
+    }
+  }
+}
