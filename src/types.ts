@@ -311,6 +311,28 @@ export const TaskBatchUpdateOutput = z.object({
 });
 export type TaskBatchUpdateOutput = z.infer<typeof TaskBatchUpdateOutput>;
 
+// ─── tool_stats ───
+export const ToolStatsOutput = z.object({
+  total: z.number(),
+  deprecated: z.number(),
+  active: z.number(),
+  per_provider: z.array(z.object({
+    provider: z.string(),
+    count: z.number(),
+  })),
+  top_tags: z.array(z.object({
+    tag: z.string(),
+    count: z.number(),
+  })),
+  recently_added: z.array(z.object({
+    name: z.string(),
+    provider: z.string(),
+    tags: z.array(z.string()),
+    created_at: z.string(),
+  })),
+});
+export type ToolStatsOutput = z.infer<typeof ToolStatsOutput>;
+
 // ─── DB row types ───
 export interface TaskRow {
   id: string;

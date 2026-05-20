@@ -164,3 +164,50 @@ export async function handleToolDeprecate(args: unknown) {
     ...(input.replacement ? { replacement: input.replacement } : {}),
   });
 }
+
+export async function handleToolStats(_args: unknown) {
+  const db = getDb();
+
+  const totalRow = db.prepare('SELECT COUNT(*) as c FROM tools').get() as { c: number };
+  const total = totalRow.c;
+
+  const deprecatedRow = db.prepare("SELECT COUNT(*) as c FROM tools WHERE description LIKE '[DEPRECATED]%'").get() as { c: number };
+  const deprecated = deprecatedRow.c;
+
+  const active = total - deprecated;
+
+  const perProvider = db.prepare(
+    'SELECT provider, COUNT(*) as count FROM tools GROUP BY provider ORDER BY count DESC'
+  ).all() as { provider: string; count: number }[];
+
+  const allTags = db.prepare('SELECT tags FROM tools').all() as { tags: string }[];
+  const tagCounts = new Map<string, number>();
+  for (const row of allTags) {
+    const tags = (row.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean);
+    for (const tag of tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+  }
+  const topTags = Array.from(tagCounts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const recentlyAdded = db.prepare(
+    'SELECT name, provider, tags, created_at FROM tools ORDER BY created_at DESC LIMIT 5'
+  ).all() as { name: string; provider: string; tags: string; created_at: string }[];
+
+  return toMCPResponse({
+    total,
+    deprecated,
+    active,
+    per_provider: perProvider,
+    top_tags: topTags,
+    recently_added: recentlyAdded.map((r) => ({
+      name: r.name,
+      provider: r.provider,
+      tags: (r.tags || '').split(',').filter(Boolean),
+      created_at: r.created_at,
+    })),
+  });
+}

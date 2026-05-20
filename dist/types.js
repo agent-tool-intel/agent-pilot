@@ -248,6 +248,26 @@ export const TaskBatchUpdateOutput = z.object({
     failures: z.array(z.object({ id: z.string(), reason: z.string() })),
     cascaded_parent_count: z.number().int().optional(),
 });
+// ─── tool_stats ───
+export const ToolStatsOutput = z.object({
+    total: z.number(),
+    deprecated: z.number(),
+    active: z.number(),
+    per_provider: z.array(z.object({
+        provider: z.string(),
+        count: z.number(),
+    })),
+    top_tags: z.array(z.object({
+        tag: z.string(),
+        count: z.number(),
+    })),
+    recently_added: z.array(z.object({
+        name: z.string(),
+        provider: z.string(),
+        tags: z.array(z.string()),
+        created_at: z.string(),
+    })),
+});
 // ─── MCP response helper ───
 export function toMCPResponse(data) {
     return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };

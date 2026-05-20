@@ -790,6 +790,84 @@ export declare const TaskBatchUpdateOutput: z.ZodObject<{
     cascaded_parent_count?: number | undefined;
 }>;
 export type TaskBatchUpdateOutput = z.infer<typeof TaskBatchUpdateOutput>;
+export declare const ToolStatsOutput: z.ZodObject<{
+    total: z.ZodNumber;
+    deprecated: z.ZodNumber;
+    active: z.ZodNumber;
+    per_provider: z.ZodArray<z.ZodObject<{
+        provider: z.ZodString;
+        count: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        provider: string;
+        count: number;
+    }, {
+        provider: string;
+        count: number;
+    }>, "many">;
+    top_tags: z.ZodArray<z.ZodObject<{
+        tag: z.ZodString;
+        count: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        count: number;
+        tag: string;
+    }, {
+        count: number;
+        tag: string;
+    }>, "many">;
+    recently_added: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        provider: z.ZodString;
+        tags: z.ZodArray<z.ZodString, "many">;
+        created_at: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        created_at: string;
+        name: string;
+        provider: string;
+        tags: string[];
+    }, {
+        created_at: string;
+        name: string;
+        provider: string;
+        tags: string[];
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    total: number;
+    deprecated: number;
+    active: number;
+    per_provider: {
+        provider: string;
+        count: number;
+    }[];
+    top_tags: {
+        count: number;
+        tag: string;
+    }[];
+    recently_added: {
+        created_at: string;
+        name: string;
+        provider: string;
+        tags: string[];
+    }[];
+}, {
+    total: number;
+    deprecated: number;
+    active: number;
+    per_provider: {
+        provider: string;
+        count: number;
+    }[];
+    top_tags: {
+        count: number;
+        tag: string;
+    }[];
+    recently_added: {
+        created_at: string;
+        name: string;
+        provider: string;
+        tags: string[];
+    }[];
+}>;
+export type ToolStatsOutput = z.infer<typeof ToolStatsOutput>;
 export interface TaskRow {
     id: string;
     parent_id: string | null;

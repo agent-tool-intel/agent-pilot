@@ -34,3 +34,9 @@ export declare function handleToolDeprecate(args: unknown): Promise<{
     }[];
     isError: boolean;
 }>;
+export declare function handleToolStats(_args: unknown): Promise<{
+    content: {
+        type: "text";
+        text: string;
+    }[];
+}>;

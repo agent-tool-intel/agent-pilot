@@ -8,7 +8,7 @@ import { getDb } from './db.js';
 import { handleTaskPlan, handleTaskStatus } from './planner.js';
 import { handleTaskNext, handleTaskUpdate } from './state-machine.js';
 import { handleTaskReflect } from './reflector.js';
-import { handleToolRegister, handleToolSearch, handleToolUpdate, handleToolDeprecate } from './tool-registry.js';
+import { handleToolRegister, handleToolSearch, handleToolUpdate, handleToolDeprecate, handleToolStats } from './tool-registry.js';
 import { handleTaskCancel } from './canceller.js';
 import { handleTaskExport } from './exporter.js';
 import { handleTaskImport } from './importer.js';
@@ -164,6 +164,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'tool_stats',
+      description: 'Get registry statistics: total tools, deprecated count, per-provider breakdown, top tags, and recently added tools. Read-only.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
+    {
       name: 'tool_export',
       description: 'Export all registered tools to a JSON file. Optionally include deprecated tools.',
       inputSchema: {
@@ -285,6 +293,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'tool_search':   return await handleToolSearch(args);
       case 'tool_update':   return await handleToolUpdate(args);
       case 'tool_deprecate': return await handleToolDeprecate(args);
+      case 'tool_stats':    return await handleToolStats(args);
       case 'tool_export':   return await handleToolExport(args);
       case 'tool_import':   return await handleToolImport(args);
       case 'task_cancel':   return await handleTaskCancel(args);
