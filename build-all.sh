@@ -150,7 +150,11 @@ PIPELINE_START=$(date +%s)
 
 FEATURES_TO_BUILD=$(get_features)
 STATE=$(load_state)
-COMPLETED=$(echo "$STATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(str(x) for x in d['completed']))" 2>/dev/null || echo "")
+COMPLETED_JSON=$(echo "$STATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(str(x) for x in d['completed']))" 2>/dev/null || echo "")
+# Also check git log for committed features (survives state file deletion)
+GIT_COMPLETED=$(git log --oneline --grep="^feat(#" | grep -oP 'feat\(#\K\d+' | sort -u | tr '\n' ',' | sed 's/,$//')
+# Merge both sources
+COMPLETED=$(echo "$COMPLETED_JSON,$GIT_COMPLETED" | tr ',' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')
 
 echo "Features to build:"
 for f in $FEATURES_TO_BUILD; do

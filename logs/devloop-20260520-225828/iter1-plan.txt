@@ -1,0 +1,10 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/importer.ts
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+Let me read the key files in detail.

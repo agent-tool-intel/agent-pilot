@@ -85,7 +85,7 @@ function flattenTree(
     depth,
   });
 
-  for (const child of node.children || []) {
+  for (const child of (Array.isArray(node.children) ? node.children : [])) {
     flattenTree(child, depth + 1, idMap, result);
   }
 }
@@ -105,11 +105,11 @@ export async function handleTaskImport(args: unknown) {
   if (!root || typeof root !== 'object') {
     return toMCPResponse({ error: 'Import file must contain a valid task tree object' });
   }
-  if (typeof root.title !== 'string' || !root.title) {
-    return toMCPResponse({ error: 'Root task must have a non-empty title' });
-  }
   if (typeof root.id !== 'string' || !root.id) {
     return toMCPResponse({ error: 'Root task must have a valid id' });
+  }
+  if (typeof root.title !== 'string' || !root.title) {
+    return toMCPResponse({ error: 'Root task must have a non-empty title' });
   }
 
   const flatTasks: FlatImportTask[] = [];
