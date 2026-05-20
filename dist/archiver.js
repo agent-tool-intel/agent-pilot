@@ -34,28 +34,37 @@ export async function handleTaskArchive(args) {
         SELECT * FROM tasks WHERE id IN (SELECT id FROM subtree)
       `).all(input.task_id)
         : [task];
+    const nonArchivable = allTasks.filter(t => !ARCHIVABLE_STATUSES.includes(t.status));
+    if (nonArchivable.length > 0) {
+        return toMCPResponse({
+            error: 'Cannot archive tree: ' + nonArchivable.length + ' task(s) have non-archivable statuses: ' +
+                nonArchivable.map(t => t.id + ' (' + t.status + ')').join(', '),
+        });
+    }
+    const allTaskIds = allTasks.map(t => t.id);
     const depthCache = new Map();
-    function computeDepth(id, parentId) {
+    function computeDepth(id, parentId, visited = new Set()) {
         const cached = depthCache.get(id);
         if (cached !== undefined)
             return cached;
-        if (!parentId) {
+        if (visited.has(id) || !parentId) {
             depthCache.set(id, 0);
             return 0;
         }
+        visited.add(id);
         const parent = allTasks.find(t => t.id === parentId);
         if (!parent) {
             depthCache.set(id, 0);
             return 0;
         }
-        const d = 1 + computeDepth(parent.id, parent.parent_id);
+        const d = 1 + computeDepth(parent.id, parent.parent_id, visited);
         depthCache.set(id, d);
         return d;
     }
     for (const t of allTasks) {
         computeDepth(t.id, t.parent_id);
     }
-    const sortedTasks = [...allTasks].sort((a, b) => depthCache.get(b.id) - depthCache.get(a.id));
+    const sortedTasks = [...allTasks].sort((a, b) => (depthCache.get(b.id) ?? 0) - (depthCache.get(a.id) ?? 0));
     const now = new Date().toISOString();
     const archiveAll = db.transaction(() => {
         const insertStmt = db.prepare(`INSERT INTO archived_tasks (id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at, archived_at)
@@ -63,11 +72,22 @@ export async function handleTaskArchive(args) {
         const deleteSnapshots = db.prepare('DELETE FROM snapshots WHERE task_id = ?');
         const deleteAuditLog = db.prepare('DELETE FROM audit_log WHERE task_id = ?');
         const deleteTask = db.prepare('DELETE FROM tasks WHERE id = ?');
+        const getTaskDepends = db.prepare('SELECT id, depends_on FROM tasks WHERE depends_on != ?');
+        const updateDepends = db.prepare('UPDATE tasks SET depends_on = ? WHERE id = ?');
         for (const { id } of sortedTasks) {
             insertStmt.run(now, id);
             deleteSnapshots.run(id);
             deleteAuditLog.run(id);
             deleteTask.run(id);
+        }
+        const archivedSet = new Set(allTaskIds);
+        const remainingTasks = getTaskDepends.all('[]');
+        for (const rt of remainingTasks) {
+            const deps = JSON.parse(rt.depends_on);
+            const cleaned = deps.filter(d => !archivedSet.has(d));
+            if (cleaned.length !== deps.length) {
+                updateDepends.run(JSON.stringify(cleaned), rt.id);
+            }
         }
     });
     archiveAll();
@@ -76,6 +96,7 @@ export async function handleTaskArchive(args) {
         title: task.title,
         subtrees_archived: allTasks.length,
         cascade: input.cascade,
+        archived_at: now,
     });
 }
 const TaskArchiveListInput = z.object({
@@ -113,37 +134,56 @@ export async function handleTaskArchiveRestore(args) {
     if (!task) {
         return toMCPResponse({ error: 'Archived task not found: ' + input.task_id });
     }
-    const subtreeIds = input.cascade
+    const subtreeRows = input.cascade
         ? db.prepare(`
         WITH RECURSIVE subtree(id) AS (
           SELECT ? UNION ALL SELECT t.id FROM archived_tasks t JOIN subtree s ON t.parent_id = s.id
         )
-        SELECT id FROM subtree
-      `).all(input.task_id).map(r => r.id)
-        : [input.task_id];
-    const conflicts = [];
-    for (const id of subtreeIds) {
-        const exists = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?').get(id);
-        if (exists.cnt > 0) {
-            conflicts.push(id);
-        }
-    }
+        SELECT * FROM archived_tasks WHERE id IN (SELECT id FROM subtree)
+      `).all(input.task_id)
+        : [task];
+    const subtreeIds = subtreeRows.map(r => r.id);
+    const placeholders = subtreeIds.map(() => '?').join(',');
+    const conflicts = db.prepare(`SELECT id FROM tasks WHERE id IN (${placeholders})`).all(...subtreeIds).map(r => r.id);
     if (conflicts.length > 0) {
         return toMCPResponse({
-            error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', '),
+            error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', ') +
+                '. Remove active tasks first or use task_duplicate on the conflicting tasks before retrying restore.',
         });
     }
+    const depthCache = new Map();
+    function computeRestoreDepth(id, parentId, visited = new Set()) {
+        const cached = depthCache.get(id);
+        if (cached !== undefined)
+            return cached;
+        if (visited.has(id) || !parentId) {
+            depthCache.set(id, 0);
+            return 0;
+        }
+        visited.add(id);
+        const parent = subtreeRows.find(t => t.id === parentId);
+        if (!parent) {
+            depthCache.set(id, 0);
+            return 0;
+        }
+        const d = 1 + computeRestoreDepth(parent.id, parent.parent_id, visited);
+        depthCache.set(id, d);
+        return d;
+    }
+    for (const t of subtreeRows) {
+        computeRestoreDepth(t.id, t.parent_id);
+    }
+    const sortedRows = [...subtreeRows].sort((a, b) => (depthCache.get(a.id) ?? 0) - (depthCache.get(b.id) ?? 0));
     const subtreeSet = new Set(subtreeIds);
     const restoreAll = db.transaction(() => {
-        const getTask = db.prepare('SELECT * FROM archived_tasks WHERE id = ?');
         const checkParentExists = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
         const insertStmt = db.prepare(`INSERT INTO tasks (id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         const deleteArchived = db.prepare('DELETE FROM archived_tasks WHERE id = ?');
-        for (const id of subtreeIds) {
-            const row = getTask.get(id);
-            if (!row)
-                continue;
+        const depExistsInTasks = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
+        const getArchivedDepends = db.prepare('SELECT id, depends_on FROM archived_tasks WHERE depends_on != ?');
+        const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
+        for (const row of sortedRows) {
             let resolvedParentId = row.parent_id;
             if (resolvedParentId && !subtreeSet.has(resolvedParentId)) {
                 const parentInTasks = checkParentExists.get(resolvedParentId).cnt > 0;
@@ -151,8 +191,29 @@ export async function handleTaskArchiveRestore(args) {
                     resolvedParentId = null;
                 }
             }
-            insertStmt.run(row.id, resolvedParentId, row.title, row.description, row.goal, row.status, row.tool_name, row.result, row.error, row.review_comment, row.priority, row.retry_count, row.max_retries, row.depends_on, row.created_at, row.updated_at);
-            deleteArchived.run(id);
+            let resolvedDependsOn = row.depends_on;
+            if (row.depends_on !== '[]') {
+                const deps = JSON.parse(row.depends_on);
+                const validDeps = deps.filter(d => {
+                    if (subtreeSet.has(d))
+                        return true;
+                    return depExistsInTasks.get(d).cnt > 0;
+                });
+                if (validDeps.length !== deps.length) {
+                    resolvedDependsOn = JSON.stringify(validDeps);
+                }
+            }
+            insertStmt.run(row.id, resolvedParentId, row.title, row.description, row.goal, row.status, row.tool_name, row.result, row.error, row.review_comment, row.priority, row.retry_count, row.max_retries, resolvedDependsOn, row.created_at, row.updated_at);
+            deleteArchived.run(row.id);
+        }
+        const restoredSet = new Set(subtreeIds);
+        const remainingArchived = getArchivedDepends.all('[]');
+        for (const ra of remainingArchived) {
+            const deps = JSON.parse(ra.depends_on);
+            const cleaned = deps.filter(d => !restoredSet.has(d));
+            if (cleaned.length !== deps.length) {
+                updateArchivedDepends.run(JSON.stringify(cleaned), ra.id);
+            }
         }
     });
     restoreAll();
@@ -160,5 +221,6 @@ export async function handleTaskArchiveRestore(args) {
         restored: task.id,
         title: task.title,
         subtrees_restored: subtreeIds.length,
+        cascade: input.cascade,
     });
 }
