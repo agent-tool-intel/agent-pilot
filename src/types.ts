@@ -269,6 +269,29 @@ export const ToolExportOutput = z.object({
 });
 export type ToolExportOutput = z.infer<typeof ToolExportOutput>;
 
+// ─── tool_import ───
+export const ToolImportInput = z.object({
+  filepath: z.string().min(1),
+  mode: z.enum(['merge', 'replace']).optional().default('merge'),
+});
+export type ToolImportInput = z.infer<typeof ToolImportInput>;
+
+export const ToolImportOutput = z.object({
+  imported: z.number().int(),
+  skipped: z.number().int(),
+  errors: z.array(z.string()),
+});
+export type ToolImportOutput = z.infer<typeof ToolImportOutput>;
+
+export interface ToolImportEntry {
+  name: string;
+  description: string;
+  schema: string;
+  provider: string;
+  tags?: string[];
+  created_at?: string;
+}
+
 // ─── 11. task_batch_update ───
 export const TaskBatchUpdateInput = z.object({
   task_ids: z.array(z.string()).min(1).describe('Array of task IDs to update'),

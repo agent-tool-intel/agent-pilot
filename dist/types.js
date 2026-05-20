@@ -223,6 +223,16 @@ export const ToolExportOutput = z.object({
     exported_to: z.string(),
     tool_count: z.number(),
 });
+// ─── tool_import ───
+export const ToolImportInput = z.object({
+    filepath: z.string().min(1),
+    mode: z.enum(['merge', 'replace']).optional().default('merge'),
+});
+export const ToolImportOutput = z.object({
+    imported: z.number().int(),
+    skipped: z.number().int(),
+    errors: z.array(z.string()),
+});
 // ─── 11. task_batch_update ───
 export const TaskBatchUpdateInput = z.object({
     task_ids: z.array(z.string()).min(1).describe('Array of task IDs to update'),

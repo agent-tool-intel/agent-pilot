@@ -702,6 +702,39 @@ export declare const ToolExportOutput: z.ZodObject<{
     tool_count: number;
 }>;
 export type ToolExportOutput = z.infer<typeof ToolExportOutput>;
+export declare const ToolImportInput: z.ZodObject<{
+    filepath: z.ZodString;
+    mode: z.ZodDefault<z.ZodOptional<z.ZodEnum<["merge", "replace"]>>>;
+}, "strip", z.ZodTypeAny, {
+    mode: "merge" | "replace";
+    filepath: string;
+}, {
+    filepath: string;
+    mode?: "merge" | "replace" | undefined;
+}>;
+export type ToolImportInput = z.infer<typeof ToolImportInput>;
+export declare const ToolImportOutput: z.ZodObject<{
+    imported: z.ZodNumber;
+    skipped: z.ZodNumber;
+    errors: z.ZodArray<z.ZodString, "many">;
+}, "strip", z.ZodTypeAny, {
+    imported: number;
+    skipped: number;
+    errors: string[];
+}, {
+    imported: number;
+    skipped: number;
+    errors: string[];
+}>;
+export type ToolImportOutput = z.infer<typeof ToolImportOutput>;
+export interface ToolImportEntry {
+    name: string;
+    description: string;
+    schema: string;
+    provider: string;
+    tags?: string[];
+    created_at?: string;
+}
 export declare const TaskBatchUpdateInput: z.ZodObject<{
     task_ids: z.ZodArray<z.ZodString, "many">;
     status: z.ZodEnum<["in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;

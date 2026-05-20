@@ -13,6 +13,7 @@ import { handleTaskDuplicate } from './duplicator.js';
 import { handleTaskBatchUpdate } from './batch-updater.js';
 import { handleTaskDependencyGraph } from './dependency-graph.js';
 import { handleToolExport } from './tool-export.js';
+import { handleToolImport } from './tool-import.js';
 import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
 const server = new Server({ name: 'task-orchestrator', version: '0.2.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -166,6 +167,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             },
         },
         {
+            name: 'tool_import',
+            description: 'Import tools from a JSON file (output of tool_export). Supports merge (INSERT OR REPLACE) and replace (clear DB then import).',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    filepath: { type: 'string', description: 'Path to the JSON file containing tool definitions' },
+                    mode: { type: 'string', enum: ['merge', 'replace'], description: 'Import mode: merge (upsert) or replace (clear + import). Default: merge' },
+                },
+                required: ['filepath'],
+            },
+        },
+        {
             name: 'task_cancel',
             description: 'Cancel a task and optionally all its descendants. Only cancellable: pending, in_progress, failed, blocked.',
             inputSchema: {
@@ -264,6 +277,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case 'tool_update': return await handleToolUpdate(args);
             case 'tool_deprecate': return await handleToolDeprecate(args);
             case 'tool_export': return await handleToolExport(args);
+            case 'tool_import': return await handleToolImport(args);
             case 'task_cancel': return await handleTaskCancel(args);
             case 'task_export': return await handleTaskExport(args);
             case 'task_import': return await handleTaskImport(args);
