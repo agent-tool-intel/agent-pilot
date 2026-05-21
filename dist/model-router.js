@@ -201,11 +201,10 @@ function routeModel(taskDescription, availableModels, planPreset) {
         return {
             model: fallback.primary,
             category: classification.category,
-            category_name: classification.category_name,
             confidence: classification.confidence,
             reason: `No model config for category '${classification.category}', using high_logic fallback`,
             plan_used: plan.plan_name,
-            estimated_cost: fallback.cost_per_1M_output || 'unknown',
+            estimated_cost_per_1M: fallback.cost_per_1M_output || 'unknown',
         };
     }
     // If no available_models provided, use all from plan
@@ -213,11 +212,10 @@ function routeModel(taskDescription, availableModels, planPreset) {
         return {
             model: taskModel.primary,
             category: classification.category,
-            category_name: classification.category_name,
             confidence: classification.confidence,
             reason: taskModel.reason || `Plan ${planPreset} default for ${classification.category_name}`,
             plan_used: plan.plan_name,
-            estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+            estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
         };
     }
     // Check if primary is available
@@ -227,11 +225,10 @@ function routeModel(taskDescription, availableModels, planPreset) {
         return {
             model: taskModel.primary,
             category: classification.category,
-            category_name: classification.category_name,
             confidence: classification.confidence,
             reason: taskModel.reason || `Matched primary for ${classification.category_name}`,
             plan_used: plan.plan_name,
-            estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+            estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
         };
     }
     // Check fallback
@@ -241,11 +238,10 @@ function routeModel(taskDescription, availableModels, planPreset) {
         return {
             model: taskModel.fallback,
             category: classification.category,
-            category_name: classification.category_name,
             confidence: classification.confidence,
             reason: `Primary '${taskModel.primary}' not available, using fallback for ${classification.category_name}`,
             plan_used: plan.plan_name,
-            estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+            estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
         };
     }
     // Fallback to any available model
@@ -253,11 +249,10 @@ function routeModel(taskDescription, availableModels, planPreset) {
     return {
         model: defaultFallback,
         category: classification.category,
-        category_name: classification.category_name,
         confidence: classification.confidence,
         reason: `Preferred models not available. Using default fallback. Available: ${availableModels.join(', ')}`,
         plan_used: plan.plan_name,
-        estimated_cost: 'unknown',
+        estimated_cost_per_1M: 'unknown',
     };
 }
 // ─── MCP Handlers ───

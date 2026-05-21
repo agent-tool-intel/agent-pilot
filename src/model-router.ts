@@ -242,7 +242,7 @@ function routeModel(
   taskDescription: string,
   availableModels: string[] | undefined,
   planPreset: string,
-): { model: string; category: string; category_name: string; confidence: number; reason: string; plan_used: string; estimated_cost: string; } {
+): { model: string; category: string; confidence: number; reason: string; plan_used: string; estimated_cost_per_1M: string; } {
   const classification = classify(taskDescription);
   const plan = loadPlanConfig(planPreset);
 
@@ -253,11 +253,10 @@ function routeModel(
     return {
       model: fallback.primary,
       category: classification.category,
-      category_name: classification.category_name,
       confidence: classification.confidence,
       reason: `No model config for category '${classification.category}', using high_logic fallback`,
       plan_used: plan.plan_name,
-      estimated_cost: fallback.cost_per_1M_output || 'unknown',
+      estimated_cost_per_1M: fallback.cost_per_1M_output || 'unknown',
     };
   }
 
@@ -266,11 +265,10 @@ function routeModel(
     return {
       model: taskModel.primary,
       category: classification.category,
-      category_name: classification.category_name,
       confidence: classification.confidence,
       reason: taskModel.reason || `Plan ${planPreset} default for ${classification.category_name}`,
       plan_used: plan.plan_name,
-      estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+      estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
     };
   }
 
@@ -284,11 +282,10 @@ function routeModel(
     return {
       model: taskModel.primary,
       category: classification.category,
-      category_name: classification.category_name,
       confidence: classification.confidence,
       reason: taskModel.reason || `Matched primary for ${classification.category_name}`,
       plan_used: plan.plan_name,
-      estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+      estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
     };
   }
 
@@ -302,11 +299,10 @@ function routeModel(
     return {
       model: taskModel.fallback,
       category: classification.category,
-      category_name: classification.category_name,
       confidence: classification.confidence,
       reason: `Primary '${taskModel.primary}' not available, using fallback for ${classification.category_name}`,
       plan_used: plan.plan_name,
-      estimated_cost: taskModel.cost_per_1M_output || 'unknown',
+      estimated_cost_per_1M: taskModel.cost_per_1M_output || 'unknown',
     };
   }
 
@@ -315,11 +311,10 @@ function routeModel(
   return {
     model: defaultFallback,
     category: classification.category,
-    category_name: classification.category_name,
     confidence: classification.confidence,
     reason: `Preferred models not available. Using default fallback. Available: ${availableModels.join(', ')}`,
     plan_used: plan.plan_name,
-    estimated_cost: 'unknown',
+    estimated_cost_per_1M: 'unknown',
   };
 }
 
