@@ -81,7 +81,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           task_id: { type: 'string', description: 'Task ID to update' },
           status: {
             type: 'string',
-            enum: ['in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled'],
+            enum: ['pending', 'in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled'],
             description: 'New status',
           },
           result: { type: 'string', description: 'Execution result' },
@@ -262,7 +262,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           status: {
             type: 'string',
-            enum: ['in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled'],
+            enum: ['pending', 'in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled'],
             description: 'New status for all tasks',
           },
           result: { type: 'string', description: 'Execution result (applied to all)' },

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 export declare const TaskStatus: z.ZodEnum<["pending", "in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
 export type TaskStatus = z.infer<typeof TaskStatus>;
-export declare const UpdateAction: z.ZodEnum<["in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
+export declare const UpdateAction: z.ZodEnum<["pending", "in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
 export declare const TaskPlanInput: z.ZodObject<{
     goal: z.ZodString;
     subtasks: z.ZodArray<z.ZodObject<{
@@ -267,20 +267,20 @@ export declare const TaskNextOutput: z.ZodObject<{
 }>;
 export declare const TaskUpdateInput: z.ZodObject<{
     task_id: z.ZodString;
-    status: z.ZodEnum<["in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
+    status: z.ZodEnum<["pending", "in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
     result: z.ZodOptional<z.ZodString>;
     error: z.ZodOptional<z.ZodString>;
     review_comment: z.ZodOptional<z.ZodString>;
     tool_name: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status: "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
+    status: "pending" | "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
     task_id: string;
     tool_name?: string | undefined;
     result?: string | undefined;
     error?: string | undefined;
     review_comment?: string | undefined;
 }, {
-    status: "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
+    status: "pending" | "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
     task_id: string;
     tool_name?: string | undefined;
     result?: string | undefined;
@@ -742,20 +742,20 @@ export interface ToolImportEntry {
 }
 export declare const TaskBatchUpdateInput: z.ZodObject<{
     task_ids: z.ZodArray<z.ZodString, "many">;
-    status: z.ZodEnum<["in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
+    status: z.ZodEnum<["pending", "in_progress", "pending_review", "approved", "needs_revision", "completed", "failed", "blocked", "cancelled"]>;
     result: z.ZodOptional<z.ZodString>;
     error: z.ZodOptional<z.ZodString>;
     review_comment: z.ZodOptional<z.ZodString>;
     tool_name: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status: "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
+    status: "pending" | "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
     task_ids: string[];
     tool_name?: string | undefined;
     result?: string | undefined;
     error?: string | undefined;
     review_comment?: string | undefined;
 }, {
-    status: "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
+    status: "pending" | "in_progress" | "pending_review" | "approved" | "needs_revision" | "completed" | "failed" | "blocked" | "cancelled";
     task_ids: string[];
     tool_name?: string | undefined;
     result?: string | undefined;

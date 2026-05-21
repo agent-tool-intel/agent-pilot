@@ -6,7 +6,7 @@ export const TaskStatus = z.enum([
     'completed', 'failed', 'blocked', 'cancelled',
 ]);
 export const UpdateAction = z.enum([
-    'in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled',
+    'pending', 'in_progress', 'pending_review', 'approved', 'needs_revision', 'completed', 'failed', 'blocked', 'cancelled',
 ]);
 // ─── 1. task_plan ───
 export const TaskPlanInput = z.object({

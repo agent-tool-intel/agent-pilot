@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { getDb } from './db.js';
-import { TaskPlanInput, toMCPResponse } from './types.js';
+import { getDb, getLatestRoot } from './db.js';
+import { TaskPlanInput, TaskStatusInput, toMCPResponse } from './types.js';
 export async function handleTaskPlan(args) {
     const input = TaskPlanInput.parse(args);
     const db = getDb();
@@ -60,10 +60,9 @@ function buildTaskTreeOutput(db, rootId, goal) {
     };
 }
 export async function handleTaskStatus(args) {
-    const { TaskStatusInput } = await import('./types.js');
     const input = TaskStatusInput.parse(args);
     const db = getDb();
-    const rootId = input.task_id || getLatestRootId(db);
+    const rootId = input.task_id || getLatestRoot(db);
     if (!rootId) {
         return toMCPResponse({ root: null, tasks: [], error: 'No tasks found' });
     }
@@ -90,10 +89,6 @@ export async function handleTaskStatus(args) {
         tasks: tree,
     });
 }
-function getLatestRootId(db) {
-    const row = db.prepare('SELECT id FROM tasks WHERE parent_id IS NULL ORDER BY created_at DESC LIMIT 1').get();
-    return row?.id ?? null;
-}
 function formatRootOutput(root) {
     return {
         id: root.id,
@@ -104,7 +99,7 @@ function formatRootOutput(root) {
         updated_at: root.updated_at,
     };
 }
-function formatTaskRow(t) {
+function formatTaskRow(t, depth = 0) {
     return {
         id: t.id,
         parent_id: t.parent_id,
@@ -118,14 +113,13 @@ function formatTaskRow(t) {
         depends_on: JSON.parse(t.depends_on || '[]'),
         created_at: t.created_at,
         updated_at: t.updated_at,
-        depth: 0,
+        depth,
     };
 }
-function buildTree(tasks, parentId) {
+function buildTree(tasks, parentId, depth = 0) {
     const children = tasks.filter(t => t.parent_id === parentId);
     return children.map(t => ({
-        ...formatTaskRow(t),
-        depth: 1,
-        children: buildTree(tasks, t.id),
+        ...formatTaskRow(t, depth),
+        children: buildTree(tasks, t.id, depth + 1),
     }));
 }
