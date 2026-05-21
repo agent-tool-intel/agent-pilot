@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/config && cp src/config/plan-*.json dist/config/",
     "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js"
+    "dev": "tsc && node dist/index.js",
+    "test": "npx --yes tsx test/test-all.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
@@ -17,6 +18,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.0",
     "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }

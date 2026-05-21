@@ -49,17 +49,29 @@ export async function handleTaskBatchUpdate(args: unknown) {
       succeeded += 1;
 
       if ((input.status === 'completed' || input.status === 'approved') && task.parent_id) {
-        const siblings = db.prepare(
-          'SELECT id, status FROM tasks WHERE parent_id = ? AND id != ?'
-        ).all(task.parent_id, taskId) as Array<{ id: string; status: string }>;
+        let currentParentId: string | null = task.parent_id;
+        while (currentParentId) {
+          const parent = db.prepare('SELECT * FROM tasks WHERE id = ?').get(currentParentId) as TaskRow | undefined;
+          if (!parent) break;
 
-        const allDone = siblings.every(s =>
-          s.status === 'completed' || s.status === 'approved'
-        );
-        if (allDone) {
-          db.prepare("UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ?")
-            .run(now, task.parent_id);
-          cascadedParentCount += 1;
+          const siblings = db.prepare(
+            'SELECT id, status FROM tasks WHERE parent_id = ? AND id != ?'
+          ).all(currentParentId, taskId) as Array<{ id: string; status: string }>;
+
+          const allDone = siblings.every(s =>
+            s.status === 'completed' || s.status === 'approved'
+          );
+
+          const parentTransitionValid = (VALID_TRANSITIONS[parent.status] || []).includes('completed');
+
+          if (allDone && parentTransitionValid) {
+            db.prepare("UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ?")
+              .run(now, currentParentId);
+            cascadedParentCount += 1;
+            currentParentId = parent.parent_id;
+          } else {
+            break;
+          }
         }
       }
     }

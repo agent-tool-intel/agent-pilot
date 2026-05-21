@@ -26,6 +26,10 @@ export async function handleTaskPlan(args) {
         const dependsOnIds = entry.depends_on_titles
             .map((t) => subtaskIds.get(t))
             .filter(Boolean);
+        const unresolved = entry.depends_on_titles.filter((t) => !subtaskIds.has(t));
+        if (unresolved.length > 0) {
+            console.error(`[task_plan] Warning: subtask "${entry.title}" depends on unknown title(s): ${unresolved.join(', ')}`);
+        }
         const status = dependsOnIds.length > 0 ? 'blocked' : 'pending';
         db.prepare('INSERT INTO tasks (id, parent_id, title, description, status, tool_name, priority, depends_on, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(entry.id, entry.parent_id, entry.title, entry.description, status, entry.tool_name, entry.priority, JSON.stringify(dependsOnIds), now, now);
     }

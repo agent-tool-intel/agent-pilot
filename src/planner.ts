@@ -37,6 +37,11 @@ export async function handleTaskPlan(args: unknown) {
       .map((t: string) => subtaskIds.get(t))
       .filter(Boolean) as string[];
 
+    const unresolved = entry.depends_on_titles.filter((t: string) => !subtaskIds.has(t));
+    if (unresolved.length > 0) {
+      console.error(`[task_plan] Warning: subtask "${entry.title}" depends on unknown title(s): ${unresolved.join(', ')}`);
+    }
+
     const status = dependsOnIds.length > 0 ? 'blocked' : 'pending';
 
     db.prepare(

@@ -98,7 +98,7 @@ export async function handleToolSearch(args) {
     let results;
     try {
         const ftsQuery = input.query
-            .replace(/[^a-zA-Z0-9_ -]/g, ' ')
+            .replace(/[^\p{L}\p{N}_ -]/gu, ' ')
             .trim()
             .split(/\s+/)
             .filter((w) => w.length > 0)

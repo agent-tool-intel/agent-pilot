@@ -3,13 +3,13 @@ import { TaskNextInput, TaskUpdateInput, toMCPResponse, type TaskRow } from './t
 
 // Expanded state transitions with dual-review
 export const VALID_TRANSITIONS: Record<string, string[]> = {
-  'pending':         ['in_progress', 'cancelled'],
+  'pending':         ['in_progress', 'cancelled', 'completed'],
   'in_progress':     ['pending_review', 'completed', 'failed', 'blocked', 'cancelled'],
   'pending_review':  ['approved', 'needs_revision'],
   'approved':        ['completed'],
   'needs_revision':  ['pending'],
   'failed':          ['pending', 'cancelled'],
-  'blocked':         ['pending', 'cancelled'],
+  'blocked':         ['pending', 'cancelled', 'completed'],
   'completed':       [],
   'cancelled':       [],
 };
@@ -132,23 +132,35 @@ export async function handleTaskUpdate(args: unknown) {
     retryCount, now, input.task_id
   );
 
-  // Parent cascade: if approved or completed, check siblings
+  // Parent cascade: if approved or completed, check siblings recursively up the chain
   let parentAutoCompleted = false;
   let parentStatus: string | undefined;
 
   if ((input.status === 'completed' || input.status === 'approved') && task.parent_id) {
-    const siblings = db.prepare(
-      'SELECT * FROM tasks WHERE parent_id = ? AND id != ?'
-    ).all(task.parent_id, input.task_id) as TaskRow[];
+    let currentParentId: string | null = task.parent_id;
+    while (currentParentId) {
+      const parent = db.prepare('SELECT * FROM tasks WHERE id = ?').get(currentParentId) as TaskRow | undefined;
+      if (!parent) break;
 
-    const allDone = siblings.every(s =>
-      s.status === 'completed' || s.status === 'approved'
-    );
-    if (allDone) {
-      db.prepare("UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ?")
-        .run(now, task.parent_id);
-      parentAutoCompleted = true;
-      parentStatus = 'completed';
+      const siblings = db.prepare(
+        'SELECT * FROM tasks WHERE parent_id = ? AND id != ?'
+      ).all(currentParentId, input.task_id) as TaskRow[];
+
+      const allDone = siblings.every(s =>
+        s.status === 'completed' || s.status === 'approved'
+      );
+
+      const parentTransitionValid = (VALID_TRANSITIONS[parent.status] || []).includes('completed');
+
+      if (allDone && parentTransitionValid) {
+        db.prepare("UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ?")
+          .run(now, currentParentId);
+        parentAutoCompleted = true;
+        parentStatus = 'completed';
+        currentParentId = parent.parent_id;
+      } else {
+        break;
+      }
     }
   }
 
@@ -156,8 +168,7 @@ export async function handleTaskUpdate(args: unknown) {
     parentStatus = 'partial_failure';
   }
 
-  // needs_revision → auto-transition back to pending for executor
-  if (input.status === 'needs_revision') {
+  if (input.status === 'needs_revision' && task.parent_id) {
     parentStatus = 'retry_issued';
   }
 

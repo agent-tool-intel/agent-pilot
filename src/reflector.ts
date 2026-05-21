@@ -28,22 +28,21 @@ export async function handleTaskReflect(args: unknown) {
   const needsRevision = tasks.filter(t => t.status === 'needs_revision').length;
   const successRate = tasks.length > 0 ? completed / tasks.length : 0;
 
-  const failedTasks = tasks.filter(t => t.status === 'failed').map(t => t.title);
-  const revisionTasks = tasks.filter(t => t.status === 'needs_revision').map(t => t.title);
+  const failedTasks = tasks.filter(t => t.status === 'failed');
+  const revisionTasks = tasks.filter(t => t.status === 'needs_revision');
 
   const suggestions: string[] = [];
 
   // Failed tasks → retry
   if (failed > 0) {
     for (const ft of failedTasks) {
-      const task = tasks.find(t => t.title === ft)!;
-      if (task.retry_count < task.max_retries) {
+      if (ft.retry_count < ft.max_retries) {
         suggestions.push(
-          "Task '" + ft + "' failed (retry " + task.retry_count + "/" + task.max_retries + "). Consider retrying."
+          "Task '" + ft.title + "' failed (retry " + ft.retry_count + "/" + ft.max_retries + "). Consider retrying."
         );
       } else {
         suggestions.push(
-          "Task '" + ft + "' exhausted retries (" + task.retry_count + "/" + task.max_retries + "). Consider skipping or replanning."
+          "Task '" + ft.title + "' exhausted retries (" + ft.retry_count + "/" + ft.max_retries + "). Consider skipping or replanning."
         );
       }
     }
@@ -52,10 +51,9 @@ export async function handleTaskReflect(args: unknown) {
   // Needs revision → Agent B feedback loop
   if (needsRevision > 0) {
     for (const rt of revisionTasks) {
-      const task = tasks.find(t => t.title === rt)!;
-      const comment = task.review_comment ? ': ' + task.review_comment : '';
+      const comment = rt.review_comment ? ': ' + rt.review_comment : '';
       suggestions.push(
-        "Task '" + rt + "' needs revision (retry " + task.retry_count + "/" + task.max_retries + ")" + comment + ". Agent should re-execute with fixes."
+        "Task '" + rt.title + "' needs revision (retry " + rt.retry_count + "/" + rt.max_retries + ")" + comment + ". Agent should re-execute with fixes."
       );
     }
   }
@@ -113,7 +111,7 @@ export async function handleTaskReflect(args: unknown) {
       pending_review: pendingReview,
       needs_revision: needsRevision,
       success_rate: Math.round(successRate * 100) / 100,
-      failed_tasks: [...failedTasks, ...revisionTasks.map(t => t + ' (needs revision)')],
+      failed_tasks: [...failedTasks.map(t => t.title), ...revisionTasks.map(t => t.title + ' (needs revision)')],
     },
     suggestions,
   });
