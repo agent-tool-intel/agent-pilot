@@ -27,7 +27,7 @@ import { handleSystemInfo } from './system-info.js';
 import { handleDataIntegrityCheck } from './integrity.js';
 
 const server = new Server(
-  { name: 'task-orchestrator', version: '0.2.0' },
+  { name: 'task-orchestrator', version: '1.0.0' },
   { capabilities: { tools: {} } },
 );
 
@@ -467,7 +467,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function main() {
   const db = getDb();
-  console.error('Task Orchestrator MCP Server v0.2.0 running on stdio');
+  console.error('Task Orchestrator MCP Server v1.0.0 running on stdio');
   console.error('Database:', db.name);
   const transport = new StdioServerTransport();
   await server.connect(transport);

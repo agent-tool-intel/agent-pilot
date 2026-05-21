@@ -130,7 +130,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
   echo "Initializing git repository..."
   git init
   git add -A
-  git commit -m "initial: Task Orchestrator MCP Server v0.2.0 (features 1-8 done)"
+  git commit -m "initial: Task Orchestrator MCP Server v1.0.0 (features 1-8 done)"
 fi
 
 # ─── Main ───

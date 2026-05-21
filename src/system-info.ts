@@ -56,7 +56,7 @@ export async function handleSystemInfo(_args: unknown) {
   return toMCPResponse({
     server: {
       name: 'task-orchestrator',
-      version: '0.2.0',
+      version: '1.0.0',
     },
     total_tasks: totalTasks,
     total_tools: totalTools,

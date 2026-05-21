@@ -11,7 +11,7 @@ Task Orchestrator is an MCP (Model Context Protocol) server that gives AI agents
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/task-orchestrator.git
+git clone https://github.com/anomalyco/task-orchestrator.git
 cd task-orchestrator
 npm install
 npm run build
@@ -371,4 +371,4 @@ Build output goes to `dist/`. Plan configs are copied from `src/config/` to `dis
 
 ---
 
-**Version:** 0.2.0 | **License:** MIT | **Database:** SQLite (WAL) | **Model Router:** Plan A/B/C (May 2026 models)
+**Version:** 1.0.0 | **License:** MIT | **Database:** SQLite (WAL) | **Model Router:** Plan A/B/C (May 2026 models)

@@ -298,7 +298,7 @@ async function main() {
     const res = await handleSystemInfo({});
     const data = assertSuccess(res);
     assert(data.server.name === 'task-orchestrator', 'Server name should match');
-    assert(data.server.version === '0.2.0', 'Server version should match');
+    assert(data.server.version === '1.0.0', 'Server version should match');
     assert(data.total_tasks > 0, 'Should have tasks');
     assert(data.total_tools >= 0, 'Should have tools count');
     assert(typeof data.database_file_size_bytes === 'number', 'Should have DB file size');
