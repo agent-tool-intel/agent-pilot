@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -93,6 +94,20 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_archived_tasks_status ON archived_tasks(status);
     CREATE INDEX IF NOT EXISTS idx_archived_tasks_archived ON archived_tasks(archived_at);
 
+    CREATE TABLE IF NOT EXISTS model_config (
+      plan      TEXT NOT NULL DEFAULT 'B',
+      category  TEXT NOT NULL,
+      primary_model   TEXT NOT NULL,
+      fallback_model  TEXT NOT NULL,
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (plan, category)
+    );
+
+    CREATE TABLE IF NOT EXISTS app_config (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TRIGGER IF NOT EXISTS trg_tasks_status_audit
       AFTER UPDATE OF status ON tasks
       FOR EACH ROW
@@ -126,6 +141,21 @@ function initSchema() {
     `);
   } catch {
     console.error('FTS5 not available, falling back to LIKE search');
+  }
+
+  const existing = db!.prepare('SELECT COUNT(*) AS cnt FROM model_config').get() as { cnt: number } | undefined;
+  if (!existing || existing.cnt === 0) {
+    const planConfig = JSON.parse(
+      readFileSync(path.resolve(__dirname, 'config', 'plan-b.json'), 'utf-8')
+    );
+    const insert = db!.prepare(
+      'INSERT OR IGNORE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)'
+    );
+    const now = new Date().toISOString();
+    for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
+      insert.run('B', cat, (cfg as any).primary, (cfg as any).fallback, now);
+    }
+    db!.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)').run('active_plan', 'B');
   }
 }
 

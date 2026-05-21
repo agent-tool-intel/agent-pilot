@@ -398,7 +398,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
         {
             name: 'model_config',
-            description: 'Manage model routing configuration: list, switch plan, set overrides, or reset to defaults.',
+            description: 'Manage model routing configuration. Actions: list (active plan + category mappings + available plans), switch (change active plan), set (override a category\'s model pair), reset (restore plan defaults). Pure CRUD, no LLM.',
             inputSchema: {
                 type: 'object',
                 properties: {

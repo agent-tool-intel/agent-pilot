@@ -711,11 +711,11 @@ export declare const ToolImportInput: z.ZodObject<{
     filepath: z.ZodString;
     mode: z.ZodDefault<z.ZodOptional<z.ZodEnum<["merge", "replace"]>>>;
 }, "strip", z.ZodTypeAny, {
-    mode: "merge" | "replace";
+    mode: "replace" | "merge";
     filepath: string;
 }, {
     filepath: string;
-    mode?: "merge" | "replace" | undefined;
+    mode?: "replace" | "merge" | undefined;
 }>;
 export type ToolImportInput = z.infer<typeof ToolImportInput>;
 export declare const ToolImportOutput: z.ZodObject<{
@@ -990,11 +990,11 @@ export declare const TaskDependencyGraphInput: z.ZodObject<{
     task_id: z.ZodOptional<z.ZodString>;
     format: z.ZodDefault<z.ZodOptional<z.ZodEnum<["mermaid", "ascii", "json"]>>>;
 }, "strip", z.ZodTypeAny, {
-    format: "json" | "mermaid" | "ascii";
+    format: "ascii" | "json" | "mermaid";
     task_id?: string | undefined;
 }, {
     task_id?: string | undefined;
-    format?: "json" | "mermaid" | "ascii" | undefined;
+    format?: "ascii" | "json" | "mermaid" | undefined;
 }>;
 export type TaskDependencyGraphInput = z.infer<typeof TaskDependencyGraphInput>;
 export interface TaskRow {

@@ -18,10 +18,14 @@ const ModelRouteInput = z.object({
 // ─── Config Schema ───
 const ModelConfigInput = z.object({
     action: z.enum(['list', 'switch', 'set', 'reset']),
-    plan: z.enum(['A', 'B', 'C']).optional().describe('Plan preset for switch/reset'),
-    category: z.string().optional().describe('Category to override (for set)'),
-    primary_model: z.string().optional().describe('Primary model (for set)'),
-    fallback_model: z.string().optional().describe('Fallback model (for set)'),
+    plan: z.enum(['A', 'B', 'C']).optional()
+        .describe('Target plan (default: active plan for list/reset/set; required for switch)'),
+    category: z.string().optional()
+        .describe('Category name to override (required for set)'),
+    primary_model: z.string().optional()
+        .describe('Primary model ID (required for set)'),
+    fallback_model: z.string().optional()
+        .describe('Fallback model ID (optional for set; keeps existing or plan default if omitted)'),
 });
 // ─── Category definitions ───
 const CATEGORY_NAMES = {
@@ -190,6 +194,22 @@ function loadPlanConfig(plan) {
     }
     return JSON.parse(readFileSync(configPath, 'utf-8'));
 }
+function getActivePlan(db) {
+    const row = db.prepare("SELECT value FROM app_config WHERE key = 'active_plan'").get();
+    return row?.value ?? 'B';
+}
+function seedPlan(db, plan, planConfig, now) {
+    const insert = db.prepare('INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)');
+    for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
+        insert.run(plan, cat, cfg.primary, cfg.fallback, now);
+    }
+}
+function getAvailablePlans() {
+    return ['A', 'B', 'C'].map(p => {
+        const cfg = loadPlanConfig(p);
+        return { plan: p, plan_name: cfg.plan_name, description: cfg.description };
+    });
+}
 // ─── Route Engine ───
 function routeModel(taskDescription, availableModels, planPreset) {
     const classification = classify(taskDescription);
@@ -269,45 +289,19 @@ export async function handleModelRoute(args) {
 export async function handleModelConfig(args) {
     const input = ModelConfigInput.parse(args);
     const db = getDb();
-    // Ensure model_config table exists
-    db.exec(`
-    CREATE TABLE IF NOT EXISTS model_config (
-      plan      TEXT NOT NULL DEFAULT 'B',
-      category  TEXT NOT NULL,
-      primary_model   TEXT NOT NULL,
-      fallback_model  TEXT NOT NULL,
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (plan, category)
-    );
-  `);
     const now = new Date().toISOString();
     switch (input.action) {
         case 'list': {
-            const plan = input.plan || 'B';
-            const rows = db.prepare('SELECT * FROM model_config WHERE plan = ?').all(plan);
+            const plan = input.plan || getActivePlan(db);
+            let rows = db.prepare('SELECT * FROM model_config WHERE plan = ?').all(plan);
             if (rows.length === 0) {
-                // Seed from default plan config
                 const planConfig = loadPlanConfig(plan);
-                const insertStmt = db.prepare('INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)');
-                for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
-                    insertStmt.run(plan, cat, cfg.primary, cfg.fallback, now);
-                }
-                const seeded = db.prepare('SELECT * FROM model_config WHERE plan = ?').all(plan);
-                return toMCPResponse({
-                    active_plan: plan,
-                    plan_name: planConfig.plan_name,
-                    description: planConfig.description,
-                    categories: seeded.map(r => ({
-                        category: r.category,
-                        name: CATEGORY_NAMES[r.category] || r.category,
-                        primary: r.primary_model,
-                        fallback: r.fallback_model,
-                    })),
-                });
+                seedPlan(db, plan, planConfig, now);
+                rows = db.prepare('SELECT * FROM model_config WHERE plan = ?').all(plan);
             }
             const planConfig = loadPlanConfig(plan);
             return toMCPResponse({
-                active_plan: plan,
+                active_plan: getActivePlan(db),
                 plan_name: planConfig.plan_name,
                 description: planConfig.description,
                 categories: rows.map(r => ({
@@ -316,46 +310,58 @@ export async function handleModelConfig(args) {
                     primary: r.primary_model,
                     fallback: r.fallback_model,
                 })),
+                available_plans: getAvailablePlans(),
             });
         }
         case 'switch': {
-            const plan = input.plan || 'B';
-            const planConfig = loadPlanConfig(plan);
-            // Re-seed for this plan
-            db.prepare('DELETE FROM model_config WHERE plan = ?').run(plan);
-            const insertStmt = db.prepare('INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)');
-            for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
-                insertStmt.run(plan, cat, cfg.primary, cfg.fallback, now);
+            if (!input.plan) {
+                return toMCPResponse({ error: 'plan is required for switch action' });
             }
+            const plan = input.plan;
+            const planConfig = loadPlanConfig(plan);
+            seedPlan(db, plan, planConfig, now);
+            db.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)').run('active_plan', plan);
             return toMCPResponse({
-                switched_to: plan,
+                active_plan: plan,
                 plan_name: planConfig.plan_name,
+                description: planConfig.description,
                 message: `Switched to Plan ${plan}. ${planConfig.description}`,
             });
         }
         case 'set': {
             if (!input.category || !input.primary_model) {
-                return toMCPResponse({ error: 'category and primary_model required for set action' });
+                return toMCPResponse({ error: 'category and primary_model are required for set action' });
             }
-            const plan = input.plan || 'B';
-            db.prepare(`
-        INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at)
-        VALUES (?, ?, ?, COALESCE(?, (SELECT fallback_model FROM model_config WHERE plan = ? AND category = ?)), ?)
-      `).run(plan, input.category, input.primary_model, input.fallback_model || null, plan, input.category, now);
+            const plan = input.plan || getActivePlan(db);
+            let fallback;
+            if (input.fallback_model !== undefined) {
+                fallback = input.fallback_model;
+            }
+            else {
+                const existing = db.prepare('SELECT fallback_model FROM model_config WHERE plan = ? AND category = ?').get(plan, input.category);
+                if (existing !== undefined) {
+                    fallback = existing.fallback_model;
+                }
+                else {
+                    const planConfig = loadPlanConfig(plan);
+                    const catCfg = planConfig.task_models[input.category];
+                    fallback = catCfg ? catCfg.fallback : '';
+                }
+            }
+            db.prepare('INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)').run(plan, input.category, input.primary_model, fallback, now);
             return toMCPResponse({
-                updated: { plan, category: input.category, primary: input.primary_model, fallback: input.fallback_model || '(unchanged)' },
+                active_plan: getActivePlan(db),
+                updated: { plan, category: input.category, primary: input.primary_model, fallback },
             });
         }
         case 'reset': {
-            const plan = input.plan || 'B';
-            db.prepare('DELETE FROM model_config WHERE plan = ?').run(plan);
+            const plan = input.plan || getActivePlan(db);
             const planConfig = loadPlanConfig(plan);
-            const insertStmt = db.prepare('INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)');
-            for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
-                insertStmt.run(plan, cat, cfg.primary, cfg.fallback, now);
-            }
+            db.prepare('DELETE FROM model_config WHERE plan = ?').run(plan);
+            seedPlan(db, plan, planConfig, now);
             return toMCPResponse({
-                reset: plan,
+                active_plan: getActivePlan(db),
+                plan,
                 plan_name: planConfig.plan_name,
                 message: `Reset Plan ${plan} to defaults`,
             });
