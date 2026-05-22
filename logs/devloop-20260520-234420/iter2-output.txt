@@ -1,0 +1,336 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m# [0mTodos
+[•] Explore codebase to find tool_update implementation
+[ ] Identify and fix issues in tool_update
+[ ] Build and verify
+[ ] Review fixes with @explore
+[ ] Iterate if needed and output SCORE
+[0m
+[0m• [0mFind tool_update implementation[90m Explore Agent[0m
+[0m✓ [0mFind tool_update implementation[90m Explore Agent[0m
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/types.ts[90m [offset=160, limit=30][0m
+[0m→ [0mRead src/index.ts[90m [offset=130, limit=40][0m
+[0m→ [0mRead src/types.ts[90m [limit=60][0m
+[0m→ [0mRead src/index.ts[90m [offset=310, limit=70][0m
+[0m✱ [0mGrep "toMCPResponse"[90m in src · 84 matches[0m
+[0m→ [0mRead src/types.ts[90m [offset=460, limit=10][0m
+[0m✱ [0mGrep "ToolRegisterInput"[90m in src · 4 matches[0m
+[0m→ [0mRead src/types.ts[90m [offset=144, limit=20][0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[•] Identify and fix issues in tool_update
+[ ] Build and verify
+[ ] Review fixes with @explore
+[ ] Iterate if needed and output SCORE
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -45,27 +45,32 @@
+   db.prepare(
+     'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+   ).run(input.name, description, schema, provider, tags.join(','), existing.created_at);
+ 
+-  try {
+-    db.prepare(
+-      'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+-    ).run(input.name);
+-    db.prepare(
+-      'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-    ).run(input.name, description, tags.join(','));
+-  } catch {
+-    // FTS5 not available
++  const descChanged = description !== existing.description;
++  const tagsChanged = tags.join(',') !== existing.tags;
++
++  if (descChanged || tagsChanged) {
++    try {
++      db.prepare(
++        'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
++      ).run(input.name);
++      db.prepare(
++        'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
++      ).run(input.name, description, tags.join(','));
++    } catch {
++      // FTS5 not available
++    }
+   }
+ 
+-  return toMCPResponse({
++  return toMCPResponse(ToolUpdateOutput.parse({
+     name: input.name,
+     description,
+     schema,
+     provider,
+     tags,
+     created_at: existing.created_at,
+-  });
++  }));
+ }
+ 
+ export async function handleToolSearch(args: unknown) {
+   const input = ToolSearchInput.parse(args);
+
+[0m
+Now I've identified the two issues. Let me fix them:
+
+1. **FTS5 sync should only happen if description/tags changed** (not always)
+2. **Output should be validated with `ToolUpdateOutput.parse()`** for type safety
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -1,6 +1,6 @@
+ import { getDb } from './db.js';
+-import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
++import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
+ 
+ export async function handleToolRegister(args: unknown) {
+   const input = ToolRegisterInput.parse(args);
+   const db = getDb();
+
+[0m
+Now I need to add `ToolUpdateOutput` to the import:
+[0m→ [0mRead src/tool-registry.ts[90m [limit=70][0m
+Let me verify the final state of the file and then build:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[✓] Identify and fix issues in tool_update
+[✓] Build and verify
+[•] Review fixes with @explore
+[ ] Iterate if needed and output SCORE
+[0m
+Build succeeded. Now let me run the review:
+[0m• [0mReview tool_update fixes thoroughly[90m General Agent[0m
+[0m✓ [0mReview tool_update fixes thoroughly[90m General Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[✓] Identify and fix issues in tool_update
+[✓] Build and verify
+[✓] Review fixes with @explore
+[•] Fix empty-string tags validation in ToolUpdateInput
+[ ] Fix non-atomic FTS5 sync with transaction
+[ ] Rebuild, re-review, and output SCORE
+[0m
+Good review - 87/100. Let me fix the two actionable LOW issues to improve the score.
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -164,9 +164,9 @@
+   name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name to update (snake_case)'),
+   description: z.string().min(1).optional().describe('New description'),
+   schema: z.string().min(1).optional().describe('New JSON Schema string'),
+   provider: z.string().min(1).optional().describe('New provider'),
+-  tags: z.array(z.string()).optional().describe('New tags for searchability'),
++  tags: z.array(z.string().min(1)).optional().describe('New tags for searchability'),
+ });
+ export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;
+ 
+ export const ToolUpdateOutput = z.object({
+
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -50,14 +50,17 @@
+ const tagsChanged = tags.join(',') !== existing.tags;
+ 
+ if (descChanged || tagsChanged) {
+   try {
+-    db.prepare(
+-      'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+-    ).run(input.name);
+-    db.prepare(
+-      'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-    ).run(input.name, description, tags.join(','));
++    const sync = db.transaction(() => {
++      db.prepare(
++        'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
++      ).run(input.name);
++      db.prepare(
++        'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
++      ).run(input.name, description, tags.join(','));
++    });
++    sync();
+   } catch {
+     // FTS5 not available
+   }
+ }
+
+[0m
+Now fix the non-atomic FTS5 sync in `tool-registry.ts`:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[✓] Identify and fix issues in tool_update
+[✓] Build and verify
+[✓] Review fixes with @explore
+[✓] Fix empty-string tags validation in ToolUpdateInput
+[✓] Fix non-atomic FTS5 sync with transaction
+[•] Rebuild, re-review, and output SCORE
+[0m
+Build succeeded. Let me do a final review:
+[0m• [0mFinal review of tool_update fixes[90m General Agent[0m
+[0m✓ [0mFinal review of tool_update fixes[90m General Agent[0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=31, limit=45][0m
+95/100. Two minor remaining items. Let me fix both:
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -40,38 +40,40 @@
+   const description = input.description ?? existing.description;
+   const schema = input.schema ?? existing.schema;
+   const provider = input.provider ?? existing.provider;
+   const tags = input.tags ?? (existing.tags || '').split(',').filter(Boolean);
++  const sortedTags = [...tags].sort();
+ 
+-  db.prepare(
+-    'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+-  ).run(input.name, description, schema, provider, tags.join(','), existing.created_at);
+-
+   const descChanged = description !== existing.description;
+-  const tagsChanged = tags.join(',') !== existing.tags;
++  const existingTagsSorted = (existing.tags || '').split(',').filter(Boolean).sort();
++  const tagsChanged = sortedTags.join(',') !== existingTagsSorted.join(',');
+ 
+-  if (descChanged || tagsChanged) {
+-    try {
+-      const sync = db.transaction(() => {
++  const write = db.transaction(() => {
++    db.prepare(
++      'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
++    ).run(input.name, description, schema, provider, sortedTags.join(','), existing.created_at);
++
++    if (descChanged || tagsChanged) {
++      try {
+         db.prepare(
+           'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+         ).run(input.name);
+         db.prepare(
+           'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-        ).run(input.name, description, tags.join(','));
+-      });
+-      sync();
+-    } catch {
+-      // FTS5 not available
++        ).run(input.name, description, sortedTags.join(','));
++      } catch {
++        // FTS5 not available
++      }
+     }
+-  }
++  });
++  write();
+ 
+   return toMCPResponse(ToolUpdateOutput.parse({
+     name: input.name,
+     description,
+     schema,
+     provider,
+-    tags,
++    tags: sortedTags,
+     created_at: existing.created_at,
+   }));
+ }
+ 
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=31, limit=50][0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[✓] Identify and fix issues in tool_update
+[✓] Build and verify
+[✓] Review fixes with @explore
+[✓] Fix empty-string tags validation in ToolUpdateInput
+[✓] Fix non-atomic FTS5 sync with transaction
+[•] Rebuild, re-review, and output SCORE
+[0m
+[0m• [0mFinal review of tool_update v3[90m Explore Agent[0m
+[0m✓ [0mFinal review of tool_update v3[90m Explore Agent[0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=1, limit=30][0m
+Critical bug found - FTS INSERT parameter count mismatch (4 `?`s but only 3 args). Also `INSERT OR REPLACE` changes rowid, orphaning FTS entries. Let me fix both properly.
+[0m✱ [0mGrep "tools_fts"[90m in src · 9 matches[0m
+[0m→ [0mRead src/db.ts[90m [limit=20, offset=96][0m
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -48,19 +48,19 @@
+ const tagsChanged = sortedTags.join(',') !== existingTagsSorted.join(',');
+ 
+ const write = db.transaction(() => {
+   db.prepare(
+-    'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+-  ).run(input.name, description, schema, provider, sortedTags.join(','), existing.created_at);
++    'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
++  ).run(description, schema, provider, sortedTags.join(','), input.name);
+ 
+   if (descChanged || tagsChanged) {
+     try {
+       db.prepare(
+         'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+       ).run(input.name);
+       db.prepare(
+         'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-      ).run(input.name, description, sortedTags.join(','));
++      ).run(input.name, input.name, description, sortedTags.join(','));
+     } catch {
+       // FTS5 not available
+     }
+   }
+
+[0m
+Now I see the bugs clearly. The FTS INSERT has 4 `?` placeholders but only 3 args passed. Also `INSERT OR REPLACE` changes rowid, orphaning FTS entries. Let me fix the `handleToolUpdate`:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/tool-registry.ts[90m [limit=55, offset=31][0m
+[0m→ [0mRead dist/tool-registry.js[90m [limit=45, offset=23][0m
+Let me verify the final implementation and run the review:
+[0m• [0mFinal review tool_update v4[90m Explore Agent[0m
+Good, compiled correctly with 4 args for 4 placeholders. Let me do the final review:
+[0m✓ [0mFinal review tool_update v4[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to find tool_update implementation
+[✓] Identify and fix issues in tool_update
+[✓] Build and verify
+[✓] Review fixes with @explore
+[✓] Fix empty-string tags validation in ToolUpdateInput
+[✓] Fix non-atomic FTS5 sync with transaction
+[✓] Rebuild, re-review, and output SCORE
+[0m
+SCORE: 96/100
+
+REVIEW_COMPLETE

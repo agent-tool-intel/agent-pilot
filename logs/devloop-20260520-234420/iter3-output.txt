@@ -1,0 +1,703 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m# [0mTodos
+[•] Explore codebase to understand existing tool_update implementation and identify issues
+[ ] Fix identified issues in tool_update
+[ ] Build: npm run build
+[ ] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+[0m• [0mExplore tool_update implementation[90m Explore Agent[0m
+[0m✓ [0mExplore tool_update implementation[90m Explore Agent[0m
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+Let me read the actual source files to spot the issues.
+Now let me try building to see if there are compile errors:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m✱ [0mGlob "**/*.test.*"[90m 100 matches[0m
+[0m✱ [0mGlob "**/*.spec.*"[90m 1 match[0m
+[0m✱ [0mGrep "TODO|FIXME|HACK|BUG"[90m in src · 0 matches[0m
+Build passes cleanly. Let me look for existing tests and examine the code for runtime/logical issues:
+[0m✱ [0mGlob "**/*review*"[90m 10 matches[0m
+[0m✱ [0mGlob "**/*REVIEW*"[90m 0 matches[0m
+[0m✱ [0mGlob "**/*.md"[90m 100 matches[0m
+[0m→ [0mRead logs/devloop-20260520-141338/iter10-review.txt
+[0m→ [0mRead logs/devloop-20260520-141338/iter9-review.txt
+[0m→ [0mRead logs/devloop-20260520-141338/iter8-review.txt
+Let me check the latest review files for issues:
+[0m→ [0mRead logs/devloop-20260520-141338/iter1-review.txt
+[0m→ [0mRead logs/devloop-20260520-141338/iter2-review.txt
+[0m→ [0mRead logs/devloop-20260520-141338/iter3-review.txt
+[0m→ [0mRead ROADMAP.md
+[0m→ [0mRead build-all.sh
+[0m✱ [0mGlob "/tmp/devloop-*/iter*-review.txt"[90m 0 matches[0m
+[0m✱ [0mGlob "/tmp/devloop-*/*"[90m 0 matches[0m
+Let me check for devloop logs related to tool_update:
+[0m→ [0mRead dist/tool-registry.js
+[0m→ [0mRead dist/types.js[90m [offset=130, limit=60][0m
+Let me check the compiled dist files to see if there's any difference from source:
+[0m→ [0mRead dist/index.js[90m [offset=120, limit=60][0m
+[0m
+[0m$ [0mcd /home/administrator/task-orchestrator && grep -n "ToolUpdateInput\|ToolUpdateOutput" src/tool-registry.ts src/types.ts src/index.ts
+src/tool-registry.ts:2:import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
+src/tool-registry.ts:32:  const input = ToolUpdateInput.parse(args);
+src/tool-registry.ts:70:  return toMCPResponse(ToolUpdateOutput.parse({
+src/types.ts:163:export const ToolUpdateInput = z.object({
+src/types.ts:170:export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;
+src/types.ts:172:export const ToolUpdateOutput = z.object({
+src/types.ts:180:export type ToolUpdateOutput = z.infer<typeof ToolUpdateOutput>;
+[0m
+Let me verify all imports/exports are consistent:
+[0m$ [0mcd /home/administrator/task-orchestrator && npx tsc --noEmit --strict 2>&1 || true
+(no output)
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[•] Fix identified issues in tool_update
+[ ] Build: npm run build
+[ ] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+[0m• [0mReview tool_update code for issues[90m Explore Agent[0m
+Let me call @explore to thoroughly review the `tool_update` feature code for all issues:
+[0m✓ [0mReview tool_update code for issues[90m Explore Agent[0m
+[0m→ [0mRead src/tool-import.ts
+The review found 17 issues. Let me fix the critical and medium ones first. Let me read `tool-import.ts` to fix the FTS parameter bug there too:
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[•] Fix #1: handleToolRegister FTS param mismatch (critical)
+[ ] Fix #2: handleToolImport FTS param mismatch (critical)
+[ ] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[ ] Fix #7,#9,#10: Low issues in handleToolUpdate
+[ ] Build: npm run build
+[ ] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Now I have a comprehensive review with 17 issues. Let me fix the critical and most impactful ones.
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -12,21 +12,22 @@
+ 
+   try {
+     db.prepare(
+       'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-    ).run(input.name, input.description, input.tags.join(','));
++    ).run(input.name, input.name, input.description, input.tags.join(','));
+   } catch {
+     // FTS5 not available
+   }
+ 
+-  return toMCPResponse({
++  const output = ToolRegisterOutput.parse({
+     name: input.name,
+     description: input.description,
+     schema: input.schema,
+     provider: input.provider,
+     tags: input.tags,
+     created_at: now,
+   });
++  return toMCPResponse(output);
+ }
+ 
+ export async function handleToolUpdate(args: unknown) {
+   const input = ToolUpdateInput.parse(args);
+
+[0m
+**Fix #1**: `handleToolRegister` FTS parameter mismatch (critical — 4 placeholders, only 3 args):
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -1,6 +1,6 @@
+ import { getDb } from './db.js';
+-import { ToolRegisterInput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
++import { ToolRegisterInput, ToolRegisterOutput, ToolSearchInput, ToolUpdateInput, ToolUpdateOutput, ToolDeprecateInput, toMCPResponse, type ToolRow } from './types.js';
+ 
+ export async function handleToolRegister(args: unknown) {
+   const input = ToolRegisterInput.parse(args);
+   const db = getDb();
+
+[0m
+Need to add `ToolRegisterOutput` to imports:
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[•] Fix #2: handleToolImport FTS param mismatch (critical)
+[ ] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[ ] Fix #7,#9,#10: Low issues in handleToolUpdate
+[ ] Build: npm run build
+[ ] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+[0m← [0mEdit src/tool-import.ts
+Index: /home/administrator/task-orchestrator/src/tool-import.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-import.ts
++++ /home/administrator/task-orchestrator/src/tool-import.ts
+@@ -91,9 +91,9 @@
+     'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+   ).run(entry.name);
+   db.prepare(
+     'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-  ).run(entry.name, entry.description, tags);
++  ).run(entry.name, entry.name, entry.description, tags);
+ } catch {
+   // FTS5 not available
+ }
+ 
+
+[0m
+**Fix #2**: `handleToolImport` FTS parameter mismatch:
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -44,21 +44,58 @@
+   const tags = input.tags ?? (existing.tags || '').split(',').filter(Boolean);
+   const sortedTags = [...tags].sort();
+ 
+   const descChanged = description !== existing.description;
++  const schemaChanged = schema !== existing.schema;
++  const providerChanged = provider !== existing.provider;
+   const existingTagsSorted = (existing.tags || '').split(',').filter(Boolean).sort();
+-  const tagsChanged = sortedTags.join(',') !== existingTagsSorted.join(',');
++  const tagsChanged = input.tags !== undefined && sortedTags.join(',') !== existingTagsSorted.join(',');
+ 
++  const nothingChanged = !descChanged && !schemaChanged && !providerChanged && !tagsChanged;
++
++  const parseResult = ToolUpdateOutput.safeParse({
++    name: input.name,
++    description,
++    schema,
++    provider,
++    tags: sortedTags,
++    created_at: existing.created_at,
++  });
++  if (!parseResult.success) {
++    return toMCPResponse({ error: 'Data integrity error: ' + parseResult.error.message });
++  }
++
++  if (nothingChanged) {
++    return toMCPResponse(parseResult.data);
++  }
++
++  const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
++  const isDeprecated = existing.description.startsWith('[DEPRECATED]');
++  let ftsHasEntry = true;
++  try {
++    const row = db.prepare(
++      'SELECT COUNT(*) as cnt FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
++    ).get(input.name) as { cnt: number } | undefined;
++    ftsHasEntry = (row?.cnt ?? 0) > 0;
++  } catch {
++    ftsHasEntry = false;
++  }
++  const shouldSyncFts = !isDeprecated && (descChanged || tagsChanged || !ftsHasEntry);
++
+   const write = db.transaction(() => {
+     db.prepare(
+       'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
+-    ).run(description, schema, provider, sortedTags.join(','), input.name);
++    ).run(description, schema, provider, tagsToWrite, input.name);
+ 
+-    if (descChanged || tagsChanged) {
++    if (shouldSyncFts) {
+       try {
+         db.prepare(
+           'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+         ).run(input.name);
++      } catch {
++        // FTS5 not available
++      }
++      try {
+         db.prepare(
+           'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+         ).run(input.name, input.name, description, sortedTags.join(','));
+       } catch {
+@@ -67,16 +104,9 @@
+     }
+   });
+   write();
+ 
+-  return toMCPResponse(ToolUpdateOutput.parse({
+-    name: input.name,
+-    description,
+-    schema,
+-    provider,
+-    tags: sortedTags,
+-    created_at: existing.created_at,
+-  }));
++  return toMCPResponse(parseResult.data);
+ }
+ 
+ export async function handleToolSearch(args: unknown) {
+   const input = ToolSearchInput.parse(args);
+
+[0m
+Now let me fix the `handleToolUpdate` function with all the medium/low fixes (#3, #4, #5, #6, #7, #10):
+[0m✗ [0mEdit src/types.ts failed
+[91m[1mError: [0mCould not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.
+Now fix #9: Prevent commas in tag strings. Update validation in types.ts:
+[0m→ [0mRead src/types.ts[90m [offset=144, limit=30][0m
+[0m
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -145,9 +145,9 @@
+   name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name (snake_case)'),
+   description: z.string().min(1).describe('What this tool does'),
+   schema: z.string().describe('JSON Schema string of input parameters'),
+   provider: z.string().describe('Which MCP server or service provides this'),
+-  tags: z.array(z.string()).optional().default([]),
++  tags: z.array(z.string().regex(/^[^,]+$/, 'Tags cannot contain commas')).optional().default([]),
+ });
+ export type ToolRegisterInput = z.infer<typeof ToolRegisterInput>;
+ 
+ export const ToolRegisterOutput = z.object({
+
+[0m
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -164,9 +164,9 @@
+   name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name to update (snake_case)'),
+   description: z.string().min(1).optional().describe('New description'),
+   schema: z.string().min(1).optional().describe('New JSON Schema string'),
+   provider: z.string().min(1).optional().describe('New provider'),
+-  tags: z.array(z.string().min(1)).optional().describe('New tags for searchability'),
++  tags: z.array(z.string().min(1).regex(/^[^,]+$/, 'Tags cannot contain commas')).optional().describe('New tags for searchability'),
+ });
+ export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;
+ 
+ export const ToolUpdateOutput = z.object({
+
+[0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=1, limit=100][0m
+Let me verify the final state of edited files and build:
+[0m→ [0mRead src/tool-registry.ts[90m [offset=100][0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[✓] Fix #7,#9,#10: Low issues in handleToolUpdate
+[•] Build: npm run build
+[ ] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[✓] Fix #7,#9,#10: Low issues in handleToolUpdate
+[✓] Build: npm run build
+[•] Review fixes with @explore
+[ ] Iterate if explore finds more issues
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Build passes cleanly. Now step 3 — review the fixes with @explore:
+[0m• [0mReview tool_update fixes[90m Explore Agent[0m
+[0m✓ [0mReview tool_update fixes[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[✓] Fix #7,#9,#10: Low issues in handleToolUpdate
+[✓] Build: npm run build
+[✓] Review fixes with @explore
+[•] Fix NEW-1: tool_import comma validation (medium)
+[ ] Fix NEW-2: FTS/tools tag mismatch (medium)
+[ ] Fix NEW-3: stale isDeprecated (low)
+[ ] Fix NEW-8: response/DB tag mismatch (low)
+[ ] Build + re-review with @explore
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Score: 82/100. Need to fix remaining issues. Let me address the MEDIUM and impactful LOW issues to raise the score:
+[0m← [0mEdit src/tool-import.ts
+Index: /home/administrator/task-orchestrator/src/tool-import.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-import.ts
++++ /home/administrator/task-orchestrator/src/tool-import.ts
+@@ -25,9 +25,9 @@
+       name: e.name,
+       description: e.description,
+       schema: e.schema,
+       provider: e.provider,
+-      tags: Array.isArray(e.tags) ? e.tags.filter((t: unknown) => typeof t === 'string') : undefined,
++      tags: Array.isArray(e.tags) ? e.tags.filter((t: unknown) => typeof t === 'string' && !(t as string).includes(',')) : undefined,
+       created_at: typeof e.created_at === 'string' ? e.created_at : undefined,
+     },
+   };
+ }
+
+[0m
+**Fix NEW-1**: Add comma validation to tool_import's validateEntry:
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -68,9 +68,10 @@
+   return toMCPResponse(parseResult.data);
+ }
+ 
+ const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
+-const isDeprecated = existing.description.startsWith('[DEPRECATED]');
++const responseTags = input.tags !== undefined ? sortedTags : (existing.tags || '').split(',').filter(Boolean);
++const isDeprecated = description.startsWith('[DEPRECATED]');
+ let ftsHasEntry = true;
+ try {
+   const row = db.prepare(
+     'SELECT COUNT(*) as cnt FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+@@ -80,29 +81,15 @@
+   ftsHasEntry = false;
+ }
+ const shouldSyncFts = !isDeprecated && (descChanged || tagsChanged || !ftsHasEntry);
+ 
+-const write = db.transaction(() => {
+-  db.prepare(
+-    'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
+-  ).run(description, schema, provider, tagsToWrite, input.name);
+-
+-  if (shouldSyncFts) {
+-    try {
+-      db.prepare(
+-        'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+-      ).run(input.name);
+-    } catch {
+-      // FTS5 not available
+-    }
+-    try {
+-      db.prepare(
+-        'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-      ).run(input.name, input.name, description, sortedTags.join(','));
+-    } catch {
+-      // FTS5 not available
+-    }
+-  }
++const parseResult = ToolUpdateOutput.safeParse({
++  name: input.name,
++  description,
++  schema,
++  provider,
++  tags: responseTags,
++  created_at: existing.created_at,
+ });
+ write();
+ 
+ return toMCPResponse(parseResult.data);
+
+[0m
+Now fix NEW-2, NEW-3, and NEW-8 in handleToolUpdate all at once:
+[0m✗ [0mEdit src/tool-registry.ts failed
+[91m[1mError: [0mCould not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.
+Now fix NEW-2: use `tagsToWrite` in FTS INSERT (matching what the tools table gets):
+[0m→ [0mRead src/tool-registry.ts[90m [offset=95, limit=15][0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=32, limit=65][0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=32, limit=70][0m
+The edits created a corrupted structure. Let me see the full current state:
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -51,14 +51,16 @@
+ const tagsChanged = input.tags !== undefined && sortedTags.join(',') !== existingTagsSorted.join(',');
+ 
+ const nothingChanged = !descChanged && !schemaChanged && !providerChanged && !tagsChanged;
+ 
++const responseTags = input.tags !== undefined ? sortedTags : (existing.tags || '').split(',').filter(Boolean);
++
+ const parseResult = ToolUpdateOutput.safeParse({
+   name: input.name,
+   description,
+   schema,
+   provider,
+-  tags: sortedTags,
++  tags: responseTags,
+   created_at: existing.created_at,
+ });
+ if (!parseResult.success) {
+   return toMCPResponse({ error: 'Data integrity error: ' + parseResult.error.message });
+@@ -68,9 +70,8 @@
+   return toMCPResponse(parseResult.data);
+ }
+ 
+ const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
+-const responseTags = input.tags !== undefined ? sortedTags : (existing.tags || '').split(',').filter(Boolean);
+ const isDeprecated = description.startsWith('[DEPRECATED]');
+ let ftsHasEntry = true;
+ try {
+   const row = db.prepare(
+@@ -81,15 +82,29 @@
+   ftsHasEntry = false;
+ }
+ const shouldSyncFts = !isDeprecated && (descChanged || tagsChanged || !ftsHasEntry);
+ 
+-const parseResult = ToolUpdateOutput.safeParse({
+-  name: input.name,
+-  description,
+-  schema,
+-  provider,
+-  tags: responseTags,
+-  created_at: existing.created_at,
++const write = db.transaction(() => {
++  db.prepare(
++    'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
++  ).run(description, schema, provider, tagsToWrite, input.name);
++
++  if (shouldSyncFts) {
++    try {
++      db.prepare(
++        'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
++      ).run(input.name);
++    } catch {
++      // FTS5 not available
++    }
++    try {
++      db.prepare(
++        'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
++      ).run(input.name, input.name, description, tagsToWrite);
++    } catch {
++      // FTS5 not available
++    }
++  }
+ });
+ write();
+ 
+ return toMCPResponse(parseResult.data);
+
+[0m
+The function got corrupted. Let me rewrite it completely with all fixes:
+[0m→ [0mRead src/tool-registry.ts[90m [offset=32, limit=75][0m
+Let me verify the function is now correct and build:
+[0m→ [0mRead src/tool-registry.ts[90m [offset=107, limit=15][0m
+Good. Now let me build:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix #3,#4,#5,#6: handleToolUpdate improvements (medium)
+[✓] Fix #7,#9,#10: Low issues in handleToolUpdate
+[✓] Build: npm run build
+[✓] Review fixes with @explore
+[✓] Fix NEW-1: tool_import comma validation (medium)
+[✓] Fix NEW-2: FTS/tools tag mismatch (medium)
+[✓] Fix NEW-3: stale isDeprecated (low)
+[✓] Fix NEW-8: response/DB tag mismatch (low)
+[•] Build + re-review with @explore
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Build passes. Now step 4 — final review with @explore:
+[0m• [0mFinal review of tool_update fixes[90m Explore Agent[0m
+[0m✓ [0mFinal review of tool_update fixes[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix remaining review issues (#3-#10)
+[✓] Build: npm run build
+[✓] Review fixes with @explore
+[✓] Fix NEW-1 through NEW-8
+[✓] Build + re-review (score: 92/100)
+[•] Fix ISSUE A: idempotency blocks FTS repair
+[ ] Fix ISSUE B: deprecation via tool_update doesn't delete FTS
+[ ] Fix ISSUE C: null created_at guard
+[ ] Build + final review
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Score: 92/100. Let me fix the 3 remaining issues to get above 95:
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -59,20 +59,14 @@
+   description,
+   schema,
+   provider,
+   tags: responseTags,
+-  created_at: existing.created_at,
++  created_at: existing.created_at || new Date().toISOString(),
+ });
+ if (!parseResult.success) {
+   return toMCPResponse({ error: 'Data integrity error: ' + parseResult.error.message });
+ }
+ 
+-if (nothingChanged) {
+-  return toMCPResponse(parseResult.data);
+-}
+-
+-const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
+-const isDeprecated = description.startsWith('[DEPRECATED]');
+ let ftsHasEntry = true;
+ try {
+   const row = db.prepare(
+     'SELECT COUNT(*) as cnt FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+@@ -80,23 +74,38 @@
+   ftsHasEntry = (row?.cnt ?? 0) > 0;
+ } catch {
+   ftsHasEntry = false;
+ }
+-const shouldSyncFts = !isDeprecated && (descChanged || tagsChanged || !ftsHasEntry);
+ 
++const isDeprecated = description.startsWith('[DEPRECATED]');
++
++if (nothingChanged && ftsHasEntry) {
++  return toMCPResponse(parseResult.data);
++}
++
++const tagsToWrite = input.tags !== undefined ? sortedTags.join(',') : existing.tags;
++
++const ftsChanged = descChanged || tagsChanged || !ftsHasEntry;
++const needsFtsDelete = isDeprecated || ftsChanged;
++const needsFtsInsert = !isDeprecated && ftsChanged;
++
+ const write = db.transaction(() => {
+-  db.prepare(
+-    'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
+-  ).run(description, schema, provider, tagsToWrite, input.name);
++  if (descChanged || schemaChanged || providerChanged || tagsChanged) {
++    db.prepare(
++      'UPDATE tools SET description = ?, schema = ?, provider = ?, tags = ? WHERE name = ?'
++    ).run(description, schema, provider, tagsToWrite, input.name);
++  }
+ 
+-  if (shouldSyncFts) {
++  if (needsFtsDelete) {
+     try {
+       db.prepare(
+         'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+       ).run(input.name);
+     } catch {
+       // FTS5 not available
+     }
++  }
++  if (needsFtsInsert) {
+     try {
+       db.prepare(
+         'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+       ).run(input.name, input.name, description, tagsToWrite);
+
+[0m
+Let me fix all three issues at once by rewriting the function body after the early-existence check:
+[0m→ [0mRead src/tool-registry.ts[90m [offset=32, limit=85][0m
+Let me verify the full function:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m• [0mFinal review v3 tool_update[90m Explore Agent[0m
+Build passes. Final review:
+[0m✓ [0mFinal review v3 tool_update[90m Explore Agent[0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=4, limit=27][0m
+Score: 98/100. Let me fix the cosmetic nit to aim higher — sort tags on register too for consistency:
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -4,17 +4,18 @@
+ export async function handleToolRegister(args: unknown) {
+   const input = ToolRegisterInput.parse(args);
+   const db = getDb();
+   const now = new Date().toISOString();
++  const sortedTags = [...input.tags].sort();
+ 
+   db.prepare(
+     'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+-  ).run(input.name, input.description, input.schema, input.provider, input.tags.join(','), now);
++  ).run(input.name, input.description, input.schema, input.provider, sortedTags.join(','), now);
+ 
+   try {
+     db.prepare(
+       'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-    ).run(input.name, input.name, input.description, input.tags.join(','));
++    ).run(input.name, input.name, input.description, sortedTags.join(','));
+   } catch {
+     // FTS5 not available
+   }
+ 
+@@ -22,9 +23,9 @@
+     name: input.name,
+     description: input.description,
+     schema: input.schema,
+     provider: input.provider,
+-    tags: input.tags,
++    tags: sortedTags,
+     created_at: now,
+   });
+   return toMCPResponse(output);
+ }
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m$ [0mgit diff --stat
+dist/tool-import.js   |  4 +--
+ dist/tool-registry.js | 69 ++++++++++++++++++++++++++++++++-----------
+ dist/types.js         |  4 +--
+ src/tool-import.ts    |  4 +--
+ src/tool-registry.ts  | 81 +++++++++++++++++++++++++++++++++++++++------------
+ src/types.ts          |  4 +--
+ 6 files changed, 122 insertions(+), 44 deletions(-)
+[0m
+[0m# [0mTodos
+[✓] Explore codebase to understand existing tool_update implementation and identify issues
+[✓] Fix #1: handleToolRegister FTS param mismatch (critical)
+[✓] Fix #2: handleToolImport FTS param mismatch (critical)
+[✓] Fix remaining review issues (#3-#10)
+[✓] Build: npm run build
+[✓] Review fixes with @explore
+[✓] Fix NEW-1 through NEW-8
+[✓] Build + re-review (score: 92/100)
+[✓] Fix ISSUE A: idempotency blocks FTS repair
+[✓] Fix ISSUE B: deprecation via tool_update doesn't delete FTS
+[✓] Fix ISSUE C: null created_at guard
+[✓] Build + final review
+[✓] Output SCORE and REVIEW_COMPLETE
+[0m
+SCORE: 98/100
+
+REVIEW_COMPLETE

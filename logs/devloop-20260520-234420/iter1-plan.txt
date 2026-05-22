@@ -1,0 +1,92 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m✱ [0mGlob "**/*test*"[90m in . · 100 matches[0m
+[0m✱ [0mGlob "**/*spec*"[90m in . · 15 matches[0m
+[0m→ [0mRead package.json
+## Implementation Plan: `tool_update` MCP Tool
+
+### Status: Already Fully Implemented
+
+After thorough analysis, the `tool_update` MCP tool is **already implemented** across all required files. Below is the detailed plan documenting every component and edge case.
+
+---
+
+### Files to Modify (none needed — existing code shown)
+
+#### 1. `src/types.ts` — Input/Output Schemas (lines 162–179)
+
+**Already defined:**
+
+```
+ToolUpdateInput:
+  - name:       required, z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/)
+  - description: optional, z.string().min(1)
+  - schema:     optional, z.string()
+  - provider:   optional, z.string()
+  - tags:       optional, z.array(z.string())
+
+ToolUpdateOutput:
+  - name, description, schema, provider, tags, created_at (all present)
+```
+
+Edge cases handled:
+- `description` has `.min(1)` — empty string rejected
+- `name` validated with snake_case regex (same as `tool_register`)
+- All fields except `name` are optional
+
+#### 2. `src/tool-registry.ts` — Handler Implementation (lines 30–70)
+
+```
+handleToolUpdate(args):
+  1. Parse input via ToolUpdateInput.parse(args)
+  2. SELECT * FROM tools WHERE name = ?
+  3. If not found → return { error: 'Tool not found: ' + input.name }
+  4. Coalesce each field: input.?? ?? existing.?
+  5. INSERT OR REPLACE INTO tools (...) VALUES (...)
+  6. If description!==undefined OR tags!==undefined:
+       DELETE old FTS5 entry, INSERT new FTS5 entry (wrapped in try/catch)
+  7. Return toMCPResponse({ name, description, schema, provider, tags, created_at })
+```
+
+Edge cases handled:
+- **Partial update**: `??` operator preserves existing values for omitted fields
+- **Tags as empty array `[]`**: explicitly clears tags (user intent), synced to FTS5
+- **FTS5 unavailability**: all FTS operations in try/catch with silent fallback
+- **created_at preserved**: uses `existing.created_at`, does NOT update timestamp
+- **Only description/tags trigger FTS sync**: schema/provider changes skip FTS update
+
+#### 3. `src/index.ts` — MCP Tool Registration (lines 143–157, 340)
+
+**Tool listing** (ListToolsRequestSchema) — lines 143–157:
+- name: `'tool_update'`
+- description: `'Update an existing tool in the registry. Only provided fields are changed.'`
+- inputSchema: name (required), description/schema/provider/tags (all optional)
+- required: `['name']`
+
+**Tool dispatch** (CallToolRequestSchema) — line 340:
+```typescript
+case 'tool_update': return await handleToolUpdate(args);
+```
+
+---
+
+### Summary
+
+| Component | File | Lines | Status |
+|---|---|---|---|
+| Input schema | `types.ts` | 162–169 | ✅ Done |
+| Output schema | `types.ts` | 171–178 | ✅ Done |
+| Handler logic | `tool-registry.ts` | 30–70 | ✅ Done |
+| Tool listing | `index.ts` | 143–157 | ✅ Done |
+| Tool dispatch | `index.ts` | 340 | ✅ Done |
+| Import | `index.ts` | 11 | ✅ Done |
+
+The implementation is complete, correct, and matches all requirements: update only provided fields, sync FTS5 on description/tags change, return updated tool, error if not found.
+
+PLAN_READY

@@ -1,8 +1,8 @@
-# Task Orchestrator MCP Server
+# AgentPilot MCP Server
 
 **Infrastructure Moat First — the stateful task engine + AI-native tool registry + Model Router for MCP**
 
-Task Orchestrator is an MCP (Model Context Protocol) server that gives AI agents persistent, auditable task infrastructure. It stores goals as task trees in SQLite, enforces valid state transitions via a deterministic state machine, provides full-text tool search through FTS5, and routes tasks to optimal models through a zero-LLM keyword-based rule engine. No embedded LLM — the server's value is infrastructure that no model upgrade can absorb.
+AgentPilot is an MCP (Model Context Protocol) server that gives AI agents persistent, auditable task infrastructure. It stores goals as task trees in SQLite, enforces valid state transitions via a deterministic state machine, provides full-text tool search through FTS5, and routes tasks to optimal models through a zero-LLM keyword-based rule engine. No embedded LLM — the server's value is infrastructure that no model upgrade can absorb.
 
 **Design Philosophy:** Model-layer features (prompt engineering, reflection heuristics, auto-decomposition) are absorbed by Anthropic/OpenAI within 6 months. Infrastructure-layer features (persistent state, database triggers, state machine enforcement, full-text search, rule engine routing) are structurally defensible. The server provides the reliable substrate; AI agents bring their own intelligence.
 
@@ -11,8 +11,8 @@ Task Orchestrator is an MCP (Model Context Protocol) server that gives AI agents
 ## Quick Start
 
 ```bash
-git clone https://github.com/anomalyco/task-orchestrator.git
-cd task-orchestrator
+git clone https://github.com/anomalyco/agent-pilot.git
+cd agent-pilot
 npm install
 npm run build
 ```
@@ -135,7 +135,7 @@ stateDiagram-v2
 
 ## Dual-Review Workflow
 
-Task Orchestrator supports a two-agent review pattern without any LLM coordination:
+AgentPilot supports a two-agent review pattern without any LLM coordination:
 
 1. **Agent A (Executor):** `task_next(mode=executor)` picks the next pending task with dependencies met
 2. Agent A executes the task, then: `task_update(task_id, status=pending_review, result=...)`
@@ -249,7 +249,7 @@ Dynamic routing reduces blended cost by ~60% vs always routing to the strongest 
 
 ## Architecture: The Infrastructure Moat
 
-These four pillars make Task Orchestrator structurally defensible against model upgrades:
+These four pillars make AgentPilot structurally defensible against model upgrades:
 
 ### 1. SQLite — Persistent State
 
@@ -288,9 +288,9 @@ Add to your Claude Code MCP configuration (`~/.claude/claude_desktop_config.json
 ```json
 {
   "mcpServers": {
-    "task-orchestrator": {
+    "agent-pilot": {
       "command": "node",
-      "args": ["/home/administrator/task-orchestrator/dist/index.js"],
+      "args": ["/home/administrator/agent-pilot/dist/index.js"],
       "env": {}
     }
   }
@@ -304,9 +304,9 @@ Add to your OpenCode configuration (`opencode.json` or `~/.config/opencode/openc
 ```json
 {
   "mcpServers": {
-    "task-orchestrator": {
+    "agent-pilot": {
       "command": "node",
-      "args": ["/home/administrator/task-orchestrator/dist/index.js"]
+      "args": ["/home/administrator/agent-pilot/dist/index.js"]
     }
   }
 }

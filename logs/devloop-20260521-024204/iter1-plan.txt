@@ -1,0 +1,212 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/types.ts
+Now let me read a few key files for precise details:
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead src/snapshot.ts
+[0m→ [0mRead src/duplicator.ts
+Now I have a complete understanding of the codebase. Let me also check the duplicator's depth-based sorting pattern which I'll reuse:
+
+Here is the detailed implementation plan.
+
+---
+
+## Implementation Plan: Task Archive MCP Tools
+
+### Overview
+Add `archived_tasks` table, three new handler files, and registration in `index.ts`. Follow the exact same pattern as existing tools (canceller.ts, duplicator.ts).
+
+---
+
+### File 1: `src/db.ts` — Add `archived_tasks` table in `initSchema()`
+
+Add after the `audit_log` table creation:
+
+```sql
+CREATE TABLE IF NOT EXISTS archived_tasks (
+    id            TEXT PRIMARY KEY,
+    parent_id     TEXT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    goal          TEXT,
+    status        TEXT NOT NULL DEFAULT 'pending',
+    tool_name     TEXT,
+    result        TEXT,
+    error         TEXT,
+    review_comment TEXT,
+    priority      INTEGER NOT NULL DEFAULT 3,
+    retry_count   INTEGER NOT NULL DEFAULT 0,
+    max_retries   INTEGER NOT NULL DEFAULT 3,
+    depends_on    TEXT NOT NULL DEFAULT '[]',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    archived_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_archived_tasks_parent ON archived_tasks(parent_id);
+CREATE INDEX IF NOT EXISTS idx_archived_tasks_status ON archived_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_archived_tasks_archived ON archived_tasks(archived_at);
+```
+
+- No FK to `tasks(id)` since the task is removed from `tasks`.
+- `parent_id` is a plain TEXT column (not a FK constraint) to allow archiving sub-trees without conflicting with the original parent still being in `tasks`.
+- Add `archived_at` column for sorting and TTL management.
+
+---
+
+### File 2: `src/archiver.ts` — New file, three handler functions
+
+#### 2a. `handleTaskArchive(args)` — Archive a completed task tree
+
+- **Zod input schema** (local):
+  ```ts
+  const TaskArchiveInput = z.object({
+    task_id: z.string().describe('Task ID to archive'),
+    cascade: z.boolean().optional().default(true).describe('Also archive all descendant tasks'),
+  });
+  ```
+
+- **Logic**:
+  1. Parse input, get DB.
+  2. Lookup task in `tasks` table. If not found → error.
+  3. Validate task status is `completed` or `approved`. If not → error with allowed statuses.
+  4. Use recursive CTE to get full subtree (or just the single task if `cascade=false`).
+  5. **Within a transaction**:
+     a. For each task in subtree: INSERT into `archived_tasks` with `archived_at = now`.
+     b. DELETE from `snapshots` WHERE task_id IN (subtree IDs).
+     c. DELETE from `audit_log` WHERE task_id IN (subtree IDs).
+     d. DELETE from `tasks` WHERE id IN (subtree IDs).
+  6. Return: `{ archived: root.id, title, subtrees_archived: count, cascade }`.
+
+- **Edge cases**:
+  - If `cascade=false` and task has children in `tasks` → error: "Cannot archive task with children; use cascade=true or move children first."
+  - If task is already being archived (not found) → handled by step 2.
+  - Transaction ensures atomicity.
+
+#### 2b. `handleTaskArchiveList(args)` — List archived tasks
+
+- **Zod input schema** (local):
+  ```ts
+  const TaskArchiveListInput = z.object({
+    status: z.string().optional().describe('Filter by status'),
+    limit: z.number().int().min(1).max(100).optional().default(50),
+    offset: z.number().int().min(0).optional().default(0),
+  });
+  ```
+
+- **Logic**:
+  1. Build query against `archived_tasks` with optional status filter.
+  2. Order by `archived_at DESC`.
+  3. Return `{ tasks: [...], total: count }`.
+
+#### 2c. `handleTaskArchiveRestore(args)` — Restore from archived_tasks to tasks
+
+- **Zod input schema** (local):
+  ```ts
+  const TaskArchiveRestoreInput = z.object({
+    task_id: z.string().describe('Task ID to restore from archive'),
+    cascade: z.boolean().optional().default(true).describe('Also restore all descendant tasks'),
+  });
+  ```
+
+- **Logic**:
+  1. Lookup task in `archived_tasks`. If not found → error.
+  2. If `cascade`, use recursive CTE on `archived_tasks` to get full subtree.
+  3. Check for ID conflicts: any task in the restore set already exists in `tasks` table → error listing conflicts. (Unlikely but safe.)
+  4. **Within a transaction**:
+     a. INSERT OR REPLACE into `tasks` (or just INSERT — conflict check handles it).
+     b. DELETE from `archived_tasks` WHERE id IN (subtree IDs).
+  5. Return `{ restored: root.id, title, subtrees_restored: count }`.
+
+- **Edge cases**:
+  - If `cascade=false` and restored task has children in `archived_tasks` → they remain archived. The restored task's `parent_id` points to the archived parent correctly (or NULL if root).
+  - ID conflict on restore → error with details.
+
+---
+
+### File 3: `src/index.ts` — Register the three new tools
+
+#### 3a. Add import:
+```ts
+import { handleTaskArchive, handleTaskArchiveList, handleTaskArchiveRestore } from './archiver.js';
+```
+
+#### 3b. Add to `ListToolsRequestSchema` handler (tool metadata array), in alphabetical position after `task_audit_log`:
+```ts
+{
+  name: 'task_archive',
+  description: 'Archive a completed task tree. Moves the task and its descendants from the active tasks table to the archived_tasks table. Only tasks with status "completed" or "approved" can be archived. Removes associated snapshots and audit log entries.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_id: { type: 'string', description: 'Task ID to archive' },
+      cascade: { type: 'boolean', description: 'Also archive all descendant tasks (default true)' },
+    },
+    required: ['task_id'],
+  },
+},
+{
+  name: 'task_archive_list',
+  description: 'List archived tasks with optional status filter and pagination.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      status: { type: 'string', description: 'Optional status filter' },
+      limit: { type: 'number', description: 'Max results (default 50, max 100)' },
+      offset: { type: 'number', description: 'Offset for pagination (default 0)' },
+    },
+  },
+},
+{
+  name: 'task_archive_restore',
+  description: 'Restore an archived task tree back to the active tasks table. Fails if IDs conflict.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_id: { type: 'string', description: 'Task ID to restore from archive' },
+      cascade: { type: 'boolean', description: 'Also restore all descendant tasks (default true)' },
+    },
+    required: ['task_id'],
+  },
+},
+```
+
+#### 3c. Add to `CallToolRequestSchema` switch statement:
+```ts
+case 'task_archive':        return await handleTaskArchive(args);
+case 'task_archive_list':   return await handleTaskArchiveList(args);
+case 'task_archive_restore': return await handleTaskArchiveRestore(args);
+```
+
+---
+
+### Edge Cases Summary
+
+| Case | Handling |
+|------|----------|
+| Task not found in `tasks` for archive | Return error |
+| Task status not completed/approved for archive | Return error listing allowed statuses |
+| Archive without cascade on task with children | Return error: must use cascade or move children first |
+| Archive with cascade where children exist | Archive entire subtree atomically in a transaction |
+| Snapshots/audit_log referencing archived task | Delete them in the same transaction |
+| Restore with ID conflict | Check first, return error listing conflicting IDs |
+| Restore without cascade on task with children | Restore single task; children remain archived |
+| Archived task not found for restore | Return error |
+| Archived task already restored (not found) | Handled by not-found check |
+| Large trees (5000+ tasks) | Uses recursive CTE (same as all other tools); transaction keeps it atomic |
+
+---
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/db.ts` | Add `archived_tasks` table (3 indexes) to `initSchema()` |
+| `src/archiver.ts` | **New file** — `handleTaskArchive`, `handleTaskArchiveList`, `handleTaskArchiveRestore` |
+| `src/index.ts` | Import + 3 tool metadata entries + 3 switch cases |
+
+PLAN_READY

@@ -1,4 +1,4 @@
-# Task Orchestrator MCP Server — Full Roadmap v3
+# AgentPilot MCP Server — Full Roadmap v3
 
 ## Design Principle: Infrastructure Moat First
 > Based on competitive research (2026-05-20): Model-layer features get absorbed by Anthropic/OpenAI within 6 months. Infrastructure-layer features (persistent state, database, state machine) are structurally defensible. **All features must be infrastructure-heavy, model-independent. No embedded LLM.**

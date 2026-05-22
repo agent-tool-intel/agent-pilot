@@ -1,0 +1,29 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/types.ts
+The `task_duplicate` tool is **already fully implemented**. No changes needed.
+
+**Existing implementation** (complete and correct):
+
+| File | What it does |
+|---|---|
+| `src/types.ts:246-255` | `TaskDuplicateInput` (requires `task_id`) and `TaskDuplicateOutput` schemas |
+| `src/duplicator.ts` | Full handler: recursive CTE fetches subtree, generates new UUIDs per task, remaps `parent_id` and `depends_on` via old→new idMap, sorts by depth for FK safety, batch-inserts in a transaction with status=`pending`, result/error/review_comment=`null`, retry_count=`0` |
+| `src/index.ts:239-248` | Tool listed in `ListToolsRequestSchema` |
+| `src/index.ts:348` | Dispatch case in `CallToolRequestSchema` |
+
+**Edge cases already handled:**
+- Non-existent `task_id` → returns error
+- Root with no children → clones just the root
+- `depends_on` referencing IDs outside the subtree → filtered out (orphaned deps dropped)
+- Transaction atomicity via `db.transaction()`
+- FK constraint ordering via depth-sorted insert (parents before children)
+
+The response matches the spec exactly: `{ original_id, new_root_id, duplicated_count: N }`.
+
+PLAN_READY

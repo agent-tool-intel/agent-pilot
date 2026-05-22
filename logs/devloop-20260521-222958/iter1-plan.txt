@@ -1,0 +1,165 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/db.ts
+Now I have a complete picture. Here's the detailed plan.
+
+---
+
+## Implementation Plan: `model_config` MCP Tool Refinement
+
+### Current State
+The tool exists in `src/model-router.ts:339-453` with `list|switch|set|reset`, a `model_config` table created inline, seeding on-demand per plan, and no global "active plan" tracking. The task asks for this plus: (a) global active plan stored and returned by `list`, (b) `list` returns "available plans" metadata, (c) seed from plan-b.json on **first run** (not on every first `list` per plan), (d) proper edge-case handling in `set` for non-seeded categories.
+
+### Files to Modify & Changes
+
+---
+
+### 1. `src/db.ts` — Add tables + first-run seeding
+
+**What:**
+
+A) Add to `initSchema()`:
+```sql
+CREATE TABLE IF NOT EXISTS model_config (
+  plan      TEXT NOT NULL DEFAULT 'B',
+  category  TEXT NOT NULL,
+  primary_model   TEXT NOT NULL,
+  fallback_model  TEXT NOT NULL,
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (plan, category)
+);
+
+CREATE TABLE IF NOT EXISTS app_config (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+```
+
+B) After all tables are created, add a first-run check:
+```typescript
+// First-run: seed plan B as default
+const existing = db!.prepare('SELECT COUNT(*) AS cnt FROM model_config').get() as { cnt: number } | undefined;
+if (!existing || existing.cnt === 0) {
+  const planConfig = JSON.parse(
+    readFileSync(resolve(__dirname, 'config', 'plan-b.json'), 'utf-8')
+  );
+  const insert = db!.prepare(
+    'INSERT OR IGNORE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
+    insert.run('B', cat, cfg.primary, cfg.fallback, new Date().toISOString());
+  }
+  db!.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)').run('active_plan', 'B');
+}
+```
+
+**Why:** Moves table DDL out of the handler (single responsibility); seeds plan B exactly once on first database creation; stores active plan globally.
+
+---
+
+### 2. `src/model-router.ts` — Refactor handler
+
+**Changes:**
+
+A) **Remove inline table creation** (lines 344-353) — now in `db.ts`.
+
+B) **Add helper functions** (after `loadPlanConfig`):
+
+```typescript
+function getActivePlan(db: Database.Database): string {
+  const row = db.prepare("SELECT value FROM app_config WHERE key = 'active_plan'").get() as { value: string } | undefined;
+  return row?.value ?? 'B';
+}
+
+function seedPlan(db: Database.Database, plan: string, planConfig: PlanConfig, now: string) {
+  const insert = db.prepare(
+    'INSERT OR REPLACE INTO model_config (plan, category, primary_model, fallback_model, updated_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  for (const [cat, cfg] of Object.entries(planConfig.task_models)) {
+    insert.run(plan, cat, cfg.primary, cfg.fallback, now);
+  }
+}
+
+function getAvailablePlans(): Array<{ plan: string; name: string; description: string }> {
+  return ['A', 'B', 'C'].map(p => {
+    const cfg = loadPlanConfig(p);
+    return { plan: p, name: cfg.plan_name, description: cfg.description };
+  });
+}
+```
+
+C) **Refactor `handleModelConfig` actions:**
+
+| Action | Changes |
+|---|---|
+| `list` | Use `input.plan || getActivePlan(db)`. After fetching rows (or seeding if empty), **append `available_plans`** key from `getAvailablePlans()`. Return `{ active_plan, plan_name, description, categories, available_plans }`. |
+| `switch` | `const plan = input.plan` (required). Call `seedPlan(...)` if `plan` not yet seeded. **Set `app_config.active_plan = plan`** via `INSERT OR REPLACE`. Return `{ active_plan: plan, plan_name, message }`. |
+| `set` | `const plan = input.plan || getActivePlan(db)`. If `fallback_model` not provided, resolve from existing row → plan JSON default → `''`. Handle non-seeded categories by reading defaults from `loadPlanConfig`. |
+| `reset` | `const plan = input.plan || getActivePlan(db)`. Delete rows for that plan, re-seed from JSON. **Do NOT change active_plan.** Return `{ plan, plan_name, message }`. |
+
+D) **Update input schema** — refine descriptions, clarify that `category`/`primary_model` are required for `set`:
+
+```typescript
+const ModelConfigInput = z.object({
+  action: z.enum(['list', 'switch', 'set', 'reset']),
+  plan: z.enum(['A', 'B', 'C']).optional()
+    .describe('Target plan (default: active plan for list/reset/set; required for switch)'),
+  category: z.string().optional()
+    .describe('Category name to override (required for set)'),
+  primary_model: z.string().optional()
+    .describe('Primary model ID (required for set)'),
+  fallback_model: z.string().optional()
+    .describe('Fallback model ID (optional for set; keeps existing or plan default if omitted)'),
+});
+```
+
+---
+
+### 3. `src/index.ts` — Update tool registration metadata
+
+**What:** Update the `model_config` tool's `description` and `inputSchema` to match the refined handler. Only the `description` text changes; the schema properties remain the same shape but descriptions improve clarity.
+
+Current:
+```
+description: 'Manage model routing configuration: list, switch plan, set overrides, or reset to defaults.',
+```
+
+New:
+```
+description: 'Manage model routing configuration. Actions: list (active plan + category mappings + available plans), switch (change active plan), set (override a category\'s model pair), reset (restore plan defaults). Pure CRUD, no LLM.',
+```
+
+Schema stays compatible (same properties), but some property descriptions are refined.
+
+---
+
+### Edge Cases Covered
+
+| Edge Case | Handling |
+|---|---|
+| First run, no DB | `db.ts` seeds plan B + sets `active_plan = 'B'` |
+| `list` before any switch | Uses `active_plan = 'B'` from `app_config` |
+| `list` with explicit plan | Shows that plan's config (seeds on demand if empty) |
+| `list` without enough context | Fallback to `getActivePlan()` → 'B' |
+| `switch` to already-active plan | Still re-seeds and updates `active_plan` (idempotent) |
+| `set` on non-seeded category | Reads default fallback from `loadPlanConfig(plan)` |
+| `set` without `fallback_model` | Preserves existing row's fallback, or falls back to plan JSON default |
+| `set` without `category` or `primary_model` | Returns error via zod validation + manual check |
+| `reset` without `plan` | Resets active plan (does not change which plan is active) |
+| `reset` with explicit `plan` | Resets that specific plan |
+| Plan JSON file missing | `loadPlanConfig` throws, caught by index.ts try/catch → error response |
+| `switch` / `set` / `reset` with invalid `category` | Accepted (category is free-text); plan JSON may have no match → `set` still writes, `list` shows it |
+
+---
+
+### Output Summary
+
+```
+PLAN_READY
+```

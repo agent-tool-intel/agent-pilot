@@ -1,0 +1,130 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/state-machine.ts
+[0m→ [0mRead src/planner.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/reflector.ts
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead src/tool-import.ts
+[0m→ [0mRead src/tool-export.ts
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/importer.ts
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead src/snapshot.ts
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/dependency-graph.ts
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/metrics.ts
+[0m→ [0mRead src/rollback.ts
+[0m→ [0mRead src/audit-log.ts
+[0m→ [0mRead src/system-info.ts
+[0m→ [0mRead src/integrity.ts
+[0m→ [0mRead src/config/plan-a.json
+[0m→ [0mRead src/config/plan-b.json
+[0m→ [0mRead src/config/plan-c.json
+[0m→ [0mRead package.json
+[0m→ [0mRead tsconfig.json
+Now I have a complete picture of all 21 source files and 3 config files. Let me produce the plan.
+
+## INTEGRATION CONSISTENCY REVIEW — FINAL PLAN
+
+After reading all 26 files in `src/` (21 `.ts`, 3 `.json` configs, `package.json`, `tsconfig.json`), here are all issues found and fixes needed:
+
+---
+
+### ISSUE 1 — `UpdateAction` Zod enum missing `pending` (types.ts + index.ts)
+
+**Problem:** `VALID_TRANSITIONS` in state-machine.ts allows transitions TO `pending` from `needs_revision`, `failed`, and `blocked`. But `UpdateAction` (types.ts:11) and the inline tool schemas (index.ts:84, index.ts:265) omit `'pending'`. Callers cannot retry a `failed` task to `pending` via the tool.
+
+**Fix:**
+- `src/types.ts:11` — Add `'pending'` to `UpdateAction` enum
+- `src/index.ts:84` — Add `'pending'` to inline schema `enum` for `task_update`
+- `src/index.ts:265` — Add `'pending'` to inline schema `enum` for `task_batch_update`
+
+---
+
+### ISSUE 2 — Dynamic import in planner.ts (planner.ts)
+
+**Problem:** `planner.ts:86` uses `await import('./types.js')` to get `TaskStatusInput`. This is inconsistent with all 20+ other files which use static imports. It bypasses TypeScript compile-time checking, adds Promise overhead, and violates project conventions.
+
+**Fix:**
+- `src/planner.ts:3` — Add `TaskStatusInput` to the existing static import from `./types.js`
+- `src/planner.ts:85-87` — Remove the dynamic import block, call `TaskStatusInput.parse(args)` directly
+
+---
+
+### ISSUE 3 — Duplicate `getLatestRootId` / `getLatestRoot` (planner.ts duplicates db.ts)
+
+**Problem:** `planner.ts:122-127` defines a private `getLatestRootId()` that does the exact same SQL query as `db.ts:162-167`'s exported `getLatestRoot()`. The only difference is parameter type (`Database.Database` vs `ReturnType<typeof getDb>`), which are equivalent.
+
+**Fix:**
+- `src/planner.ts:2` — Add `getLatestRoot` to the import from `./db.js`
+- `src/planner.ts:90` — Replace `getLatestRootId(db)` with `getLatestRoot(db)`
+- `src/planner.ts:122-127` — Delete the duplicate `getLatestRootId` function
+
+---
+
+### ISSUE 4 — Version mismatch (package.json vs index.ts)
+
+**Problem:** `package.json:3` says `"version": "0.1.0"` but `index.ts:30` says `version: '0.2.0'`.
+
+**Fix:**
+- `src/package.json:3` — Change `"version": "0.1.0"` to `"version": "0.2.0"`
+
+---
+
+### ISSUE 5 — Tree depth always 0 or 1 in planner.ts `buildTree`/`formatTaskRow`
+
+**Problem:** `planner.ts:140-156` defines `formatTaskRow` which sets `depth: 0`, then `buildTree` overrides to `depth: 1` but doesn't track recursive depth. All nested levels show `depth: 1`.
+
+**Fix:**
+- `src/planner.ts:140` — Change `formatTaskRow` to accept an optional `depth` parameter (default `0`)
+- `src/planner.ts:154` — Pass proper depth: `depth: 1` for children, `depth: depth + 1` recursively
+- `src/planner.ts:158-164` — Update `buildTree` to accept and pass `depth` parameter
+
+---
+
+### ISSUE 6 — Naming collision risk: `flattenTree` (importer.ts + exporter.ts)
+
+**Problem:** Both `importer.ts:49` and `exporter.ts:70` export a function named `flattenTree` with different signatures and types. If both are ever imported into the same scope, one would shadow the other.
+
+**Assessment:** Low risk since they're in different modules and never co-imported. No change needed.
+
+---
+
+### Additional verification checks (all PASS):
+
+| Check | Result |
+|---|---|
+| All 30 tools in ListTools match 30 cases in CallTool switch | ✅ |
+| All 21 handler modules imported in index.ts | ✅ |
+| No orphaned/unused imports in any file | ✅ |
+| Error handling pattern (toMCPResponse + try/catch) consistent | ✅ |
+| VALID_TRANSITIONS keys match TaskStatus enum values (9/9) | ✅ |
+| Config files (plan-a.json, plan-b.json, plan-c.json) exist and are valid JSON | ✅ |
+| All 8 `task_models` category keys present in all 3 configs | ✅ |
+| Build copies configs to `dist/config/` via `package.json` scripts | ✅ |
+| Phase 5 features (dual review, archiving, batch, rollback, refactor, metrics) | ✅ |
+| Phase 5.5 features (snapshot, dependency graph, integrity, model router) | ✅ |
+
+---
+
+### Summary of Files to Modify
+
+| File | Changes |
+|---|---|
+| `src/types.ts` | Add `'pending'` to `UpdateAction` (line 11) |
+| `src/index.ts` | Add `'pending'` to `task_update` enum (line 84) and `task_batch_update` enum (line 265) |
+| `src/planner.ts` | Replace dynamic import with static; import `getLatestRoot` from db; delete duplicate; fix tree depth |
+| `src/package.json` | Bump version to `0.2.0` (line 3) |
+
+**Total: 4 files, ~9 edits.**
+
+PLAN_READY

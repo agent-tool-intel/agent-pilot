@@ -1,0 +1,31 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/snapshot.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/index.ts
+Good, the exploration reveals the codebase already has a `snapshot.ts` and a registered `task_snapshot` tool. Let me read the actual files to understand exactly what exists vs. what's needed.
+## Analysis: `task_snapshot` already exists
+
+After reading all source files, the `task_snapshot` tool is **already fully implemented** across 4 files:
+
+| File | What exists | Status |
+|------|-------------|--------|
+| `src/db.ts:43-50` | `snapshots` table DDL (id, task_id, label, tree_json, created_at) + index | ✅ Done |
+| `src/types.ts:446-457` | `TaskSnapshotInput` (task_id required, label optional) + `TaskSnapshotOutput` schemas | ✅ Done |
+| `src/snapshot.ts:1-98` | Full handler with recursive CTE, tree building, JSON serialization, insert | ✅ Done |
+| `src/index.ts:314-325,357` | Tool registered in `ListToolsRequestSchema` + dispatched in `CallToolRequestSchema` | ✅ Done |
+
+The handler already:
+- Fetches root + all descendants via recursive CTE
+- Builds a recursive `SnapshotTaskNode` tree
+- `JSON.stringify`-s it into `tree_json`
+- Inserts into `snapshots` with UUID + timestamp
+- Returns `{ snapshot_id, task_count, created_at }`
+
+**Plan: No changes needed.** The implementation matches the spec exactly. Edge cases (task not found, empty subtrees, multiple snapshots of same root, non-root `task_id`) are all handled.
+
+PLAN_READY

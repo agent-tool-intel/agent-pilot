@@ -1,0 +1,51 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/state-machine.ts
+[0m
+[0m$ [0mgit log --oneline -20
+20525fa checkpoint: best-score-100
+6d48a66 checkpoint: best-score-100
+387a03a checkpoint: best-score-17
+27f2b8a checkpoint: best-score-16
+ab2955b feat(#20): task_metrics
+3fac03a feat(#19): task_audit_log
+3286239 feat(#18): tool_stats
+8a960cc feat(#18): tool_stats
+d4e59a7 feat(#17): tool_import
+66dda09 feat(#16): tool_export
+5bf33f7 feat(#15): tool_deprecate
+[0m
+[0m✱ [0mGrep "task_batch_update"[90m in . · 8 matches[0m
+[0m✱ [0mGlob "**/*test*"[90m in . · 100 matches[0m
+[0m✱ [0mGlob "**/__tests__/**"[90m in . · 0 matches[0m
+[0m→ [0mRead build-all.sh
+[0m→ [0mRead dist/index.js[90m [offset=238, limit=40][0m
+[0m→ [0mRead dist/index.js[90m [offset=335, limit=10][0m
+The `task_batch_update` tool already exists and is fully implemented. Here is what's in place:
+
+## Existing Implementation — No Changes Needed
+
+| File | Lines | What |
+|------|-------|------|
+| `src/types.ts` | 297–314 | `TaskBatchUpdateInput` (Zod: `task_ids: string[]`, `status: UpdateAction`, optional `result`/`error`/`review_comment`/`tool_name`) + `TaskBatchUpdateOutput` (Zod: `succeeded`, `failed`, `failures: [{id, reason}]`) |
+| `src/batch-updater.ts` | 1–74 | `handleTaskBatchUpdate` — parses input, iterates in a DB transaction, validates each task exists, validates each status transition via `VALID_TRANSITIONS`, increments retry count for `failed`/`needs_revision`, runs UPDATE, cascades parent auto-complete, returns `{succeeded, failed, failures, cascaded_parent_count}` |
+| `src/index.ts` | 17 | Import: `import { handleTaskBatchUpdate } from './batch-updater.js'` |
+| `src/index.ts` | 250–272 | Tool registration in `ListToolsRequestSchema` with full `inputSchema` (array for `task_ids`, enum for `status`, optional strings) |
+| `src/index.ts` | 349 | Dispatch: `case 'task_batch_update': return await handleTaskBatchUpdate(args)` |
+| `dist/index.js`, `dist/types.js` | — | Already compiled and present |
+
+### Edge Cases Handled
+- **Task not found** → recorded in `failures` array with reason `'Task not found'`, continues to next
+- **Invalid status transition** → recorded in `failures` with the allowed transitions listed, continues
+- **Retry increment** → `failed` or `needs_revision` increments `retry_count`
+- **Parent cascade** → if `completed`/`approved` and all siblings done, parent auto-completes; counter returned as `cascaded_parent_count`
+- **Empty task_ids** → Zod rejects with `min(1)` validation error
+- **Transaction atomicity** → all updates in single `db.transaction()` — each task's success/failure is independent
+
+PLAN_READY

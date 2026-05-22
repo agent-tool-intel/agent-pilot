@@ -1,0 +1,40 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/state-machine.ts
+The `task_batch_update` tool is already fully implemented in the codebase. Let me verify the build passes and confirm completeness.
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m$ [0mgrep -n "task_batch_update\|handleTaskBatchUpdate\|batch-updater" dist/index.js | head -20
+14:import { handleTaskBatchUpdate } from './batch-updater.js';
+242:            name: 'task_batch_update',
+340:            case 'task_batch_update': return await handleTaskBatchUpdate(args);
+[0m
+[0m$ [0mgrep -c "handleTaskBatchUpdate\|TaskBatchUpdate" dist/types.js
+2
+[0m
+Build passes cleanly. Let me verify the compiled output includes the batch updater:
+The `task_batch_update` tool is fully implemented and compiles cleanly. Here's the review summary:
+
+## Implementation Review
+
+| Criteria | Status |
+|----------|--------|
+| **Types** (`src/types.ts:297-314`) | `TaskBatchUpdateInput` has `task_ids` (min 1), `status` (UpdateAction), optional `result`/`error`/`review_comment`/`tool_name`. `TaskBatchUpdateOutput` has `succeeded`, `failed`, `failures: [{id, reason}]`, `cascaded_parent_count` |
+| **Handler** (`src/batch-updater.ts:1-74`) | Transaction-scoped loop: validates existence, validates transition, increments retry on `failed`/`needs_revision`, runs UPDATE, cascades parent auto-complete. Partial success via failures array |
+| **Registration** (`src/index.ts:17,250-273,349`) | Imported, listed in `ListToolsRequestSchema` with full `inputSchema`, dispatched in `CallToolRequestSchema` switch |
+| **Validation** | Empty `task_ids` rejected by Zod `min(1)`. Invalid transitions fail per-task with allowed list in reason |
+| **Consistency** | Matches `task_update` behavior (same transitions, retry logic, parent cascade, tool_name preservation) |
+| **Build** | `tsc` passes with zero errors |
+
+**SCORE: 100/100**
+
+**REVIEW_COMPLETE**

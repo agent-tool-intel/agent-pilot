@@ -1,0 +1,91 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+[0m$ [0mls -la /mnt/f/auto-model-router/config/ 2>/dev/null || echo "Path not found"
+Path not found
+[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/config/plan-b.json
+[0m→ [0mRead src/config/plan-a.json
+[0m→ [0mRead src/config/plan-c.json
+Now I have a complete picture of the existing implementation. Let me compile the detailed plan.
+
+---
+
+## Implementation Plan: `model_route` MCP Tool
+
+### Current State
+The `model_route` tool already exists in `src/model-router.ts` (lines 241-342) and is registered in `src/index.ts` (lines 395-406, 448). However, there are discrepancies between the current implementation and the specification:
+
+### Discrepancies Identified
+
+| Aspect | Current | Required |
+|--------|---------|----------|
+| Return field name | `estimated_cost` | `estimated_cost_per_1M` |
+| Return includes | `category_name` (Chinese label) | Only `category` (key) |
+| Plan A `image_generation` | `cost_per_image` (wrong key) | Must have `cost_per_1M_output` |
+| Plan B `image_generation` | `cost_per_image` (wrong key) | Must have `cost_per_1M_output` |
+| Plan B `video_audio` | `cost` (wrong key) | Must have `cost_per_1M_output` |
+| Plan C all entries | No `cost_per_1M_output` at all | Must add for all 8 categories |
+| Plan config location | Already at `src/config/` with 2026-05-20 data | Already in place — verify |
+
+### Edge Cases to Handle
+1. **Empty `available_models`** (explicit `[]` or `undefined`) → use primary from plan config (already handled)
+2. **Unknown category in plan** (e.g., a future category not in config) → fallback to `high_logic` (already handled)
+3. **No matching model in `available_models`** → try fallback, then `default_fallback` (already handled)
+4. **Case-insensitive model matching** → already uses `.toLowerCase()` `includes()` comparison
+5. **Partial model name matching** (e.g., `"gpt-4"` matching `"gpt-40"`) → current `includes()` is loose; consider `some(m => m.toLowerCase() === taskModel.primary.toLowerCase())` for exact match as a refinement option
+6. **Plan config file missing** → throws error (already handled)
+7. **`confidence` = 0** (no keywords matched) → ultimate fallback to `high_logic` with 0.3 confidence (already handled)
+8. **No `cost_per_1M_output` in plan entry** → currently returns `'unknown'`; need to ensure all entries have this field
+
+### Files to Modify
+
+#### 1. `src/config/plan-a.json`
+- **Change**: Add `"cost_per_1M_output"` field to `task_models.image_generation`
+- **Current**: `"cost_per_image": "~$0.04-0.12"`
+- **New**: add `"cost_per_1M_output": "per-image ~$0.04-0.12"` alongside or replacing the old key
+- **Reason**: `routeModel()` only reads `cost_per_1M_output`
+
+#### 2. `src/config/plan-b.json`
+- **Change**: Add `"cost_per_1M_output"` to `task_models.image_generation` and `task_models.video_audio`
+- **Current**: `image_generation` has `"cost_per_image": "~¥0.1-0.3"`, `video_audio` has `"cost": "按量計費"`
+- **New**: add `"cost_per_1M_output"` to both (e.g., `"per-image ~¥0.1-0.3"` and `"按量計費"` respectively)
+
+#### 3. `src/config/plan-c.json`
+- **Change**: Add `"cost_per_1M_output"` to all 8 `task_models` entries (currently none have one)
+- **New values** (approximate, based on GLM pricing):
+  - `high_logic`: `"¥12"`
+  - `code_generation`: `"¥12"`
+  - `creative_writing`: `"¥12"`
+  - `info_reading`: `"¥1"`
+  - `simple_repeat`: `"¥1"`
+  - `image_understanding`: `"¥2"`
+  - `image_generation`: `"per-image ~¥0.1-0.3"`
+  - `video_audio`: `"按量計費"`
+
+#### 4. `src/model-router.ts`
+- **Change A**: Update `routeModel()` return type annotation — rename `estimated_cost` → `estimated_cost_per_1M`, remove `category_name`
+- **Change B**: Update all `return` statements in `routeModel()`:
+  - Replace `estimated_cost: ...` with `estimated_cost_per_1M: ...` in all 6 return paths (lines 253-261, 265-274, 283-292, 301-310, 314-323, plus... actually there are 5: category not found, no available_models, primary available, fallback available, default fallback)
+  - Remove `category_name` from all return objects
+- **Change C**: Update `handleModelRoute` export — no change needed (it just passes through)
+
+#### 5. `src/index.ts`
+- **No change needed** — import and registration already in place at lines 21, 398-406, 448
+
+### Verification
+After changes:
+```bash
+npm run build  # TypeScript compilation
+```
+Verify the tool returns the correct shape: `{ model, category, confidence, reason, estimated_cost_per_1M, plan_used }`
+
+---
+
+**PLAN_READY**

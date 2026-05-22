@@ -1,0 +1,6 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m• [0mRead plan config files[90m General Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m

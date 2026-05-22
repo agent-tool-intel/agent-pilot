@@ -1,0 +1,130 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/state-machine.ts
+[0m→ [0mRead src/system-info.ts
+Let me read one more handler file to confirm the pattern, and check what `db.name` returns.
+[0m→ [0mRead src/metrics.ts
+Now I have a complete understanding of the codebase. Here is the detailed implementation plan.
+
+---
+
+## Implementation Plan: `data_integrity_check` MCP Tool
+
+### Overview
+New file + 2 modified files. Handler checks 10 categories of integrity issues, optionally auto-repairs. Follows existing conventions exactly.
+
+---
+
+### Files to Create
+
+#### 1. `src/integrity.ts` (new — ~250 lines)
+
+Exports a single async handler: `handleDataIntegrityCheck(args)`.
+
+**Checks performed (in order):**
+
+| # | Check | SQL/Logic | Repair action |
+|---|-------|-----------|--------------|
+| 1 | **Invalid status** | `SELECT * FROM tasks WHERE status NOT IN (valid enum values)` | Set status → `'pending'` |
+| 2 | **Orphan parent_id** | `SELECT * FROM tasks WHERE parent_id IS NOT NULL AND parent_id NOT IN (SELECT id FROM tasks)`, including `id == parent_id` | Set `parent_id = NULL` |
+| 3 | **Broken depends_on** | For each task, `JSON.parse(depends_on)`, filter IDs not in tasks table, plus self-refs `depId == task.id` | Remove invalid + self-ref IDs from array, deduplicate |
+| 4 | **Duplicate depends_on** | For each task, `JSON.parse(depends_on)` has duplicate entries | Deduplicate array |
+| 5 | **Retry count exceeded** | `SELECT * FROM tasks WHERE retry_count > max_retries` | Clamp `retry_count = max_retries` |
+| 6 | **Orphan snapshots** | `SELECT * FROM snapshots WHERE task_id NOT IN (SELECT id FROM tasks)` | `DELETE FROM snapshots WHERE ...` |
+| 7 | **Orphan audit_log** | `SELECT * FROM audit_log WHERE task_id NOT IN (SELECT id FROM tasks)` | `DELETE FROM audit_log WHERE ...` |
+| 8 | **Broken tool_name refs** | `SELECT * FROM tasks WHERE tool_name IS NOT NULL AND tool_name NOT IN (SELECT name FROM tools)` | `SET tool_name = NULL` |
+| 9 | **Circular parent refs (direct)** | `WITH RECURSIVE` cycle detection on parent_id chain | Report only (too dangerous to auto-break) |
+| 10 | **Circular dependency (depends_on)** | Build adjacency from depends_on, DFS detect cycles | Report only (too complex to auto-fix) |
+
+**For each issue found, push to `issues[]` with shape:**
+```typescript
+{ type: string, task_id?: string, description: string }
+```
+
+At the end, compute: `healthy = issues.length === 0`.
+
+If `repair === true`, wrap all repair mutations in `db.transaction(...)` for atomicity, then re-run the checks to generate a final report reflecting the repaired state.
+
+**Zod schemas used** (defined in types.ts):
+- `DataIntegrityCheckInput`: `z.object({ repair: z.boolean().optional().default(false) })`
+- `DataIntegrityCheckOutput`: defined but not strictly parsed on output (uses `toMCPResponse` with raw object, consistent with rest of codebase)
+
+**Imports:**
+```typescript
+import { getDb } from './db.js';
+import { toMCPResponse, TaskStatus } from './types.js';
+```
+
+---
+
+### Files to Modify
+
+#### 2. `src/types.ts` (additions at end, before `toMCPResponse`)
+
+Add:
+```typescript
+// ─── 26. data_integrity_check ───
+export const DataIntegrityCheckInput = z.object({
+  repair: z.boolean().optional().default(false)
+    .describe('If true, auto-repair fixable issues'),
+});
+export type DataIntegrityCheckInput = z.infer<typeof DataIntegrityCheckInput>;
+
+export interface IntegrityIssue {
+  type: string;
+  task_id?: string;
+  description: string;
+}
+```
+
+#### 3. `src/index.ts` (3 insertions)
+
+1. **Import line** (after line 25, before `const server`):
+   ```typescript
+   import { handleDataIntegrityCheck } from './integrity.js';
+   ```
+
+2. **Tool definition** in `ListToolsRequestSchema` (after `system_info` block, before closing `]`):
+   ```typescript
+   {
+     name: 'data_integrity_check',
+     description: 'Scan database for orphans, broken refs, and inconsistent states. Optionally auto-repair.',
+     inputSchema: {
+       type: 'object',
+       properties: {
+         repair: { type: 'boolean', description: 'Auto-repair fixable issues (default: false)' },
+       },
+     },
+   },
+   ```
+
+3. **Dispatch case** in `CallToolRequestSchema` (after `'system_info'` case):
+   ```typescript
+   case 'data_integrity_check': return await handleDataIntegrityCheck(args);
+   ```
+
+---
+
+### Edge Cases Handled
+
+- **Empty DB**: zero issues found, `healthy: true`
+- **Malformed `depends_on` JSON**: caught by `JSON.parse` try-catch, reported as its own issue type `'malformed_depends_on'`, repair restores to `'[]'`
+- **Self-referencing `parent_id`**: caught by orphan check (`id == parent_id`), repair sets to NULL
+- **Circular dependency chains of arbitrary length**: DFS with visited set, cycle detection via ancestor tracking
+- **Circular parent chains**: recursive CTE detects if any task is its own ancestor in parent_id chain
+- **Concurrent mutation safety**: repairs wrapped in `db.transaction()` (SQLite serializes writes)
+- **Numeric overflow**: `retry_count` and `max_retries` are bounded integers by schema; clamp uses `Math.min(retry_count, max_retries)` which is safe in JS for SQLite INTEGER range
+- **depends_on with empty array `[]`**: trivially passes checks
+- **audit_log entries with no matching task** (no FK constraint): repaired by deletion
+- **tool_name referencing tool that was later deleted**: repaired by NULLing it
+- **Multiple issues on the same task**: each issue type reported separately; repairs applied in sequence within the transaction
+
+---
+
+PLAN_READY

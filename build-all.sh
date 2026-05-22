@@ -1,5 +1,5 @@
 #!/bin/bash
-# build-all.sh — Full automated build pipeline for Task Orchestrator
+# build-all.sh — Full automated build pipeline for AgentPilot
 #
 # For each feature: Plan → Build → Explore → Score ≥98 → Git commit
 # After all features: Integration Review → Fix cross-feature issues → Git commit
@@ -13,7 +13,7 @@
 
 set -e
 
-PROJECT_DIR="/home/administrator/task-orchestrator"
+PROJECT_DIR="/home/administrator/agent-pilot"
 DEVLOP="$PROJECT_DIR/../devloop.sh"
 ROADMAP="$PROJECT_DIR/ROADMAP.md"
 STATE_FILE="/tmp/build-all-state.json"
@@ -47,11 +47,11 @@ FEATURES[26]="model_classify:Add a model_classify MCP tool. This is a pure rule 
 FEATURES[27]="model_route:Add a model_route MCP tool. Input: task_description (string), available_models (string array, optional — if empty, use all models from active plan), plan_preset (A|B|C, optional, default 'B'). Logic: 1) Call classify internally 2) Look up category in plan preset config 3) If preferred model in available_models → use it 4) Else try fallback 5) Else use default_fallback. Copy plan configs from /mnt/f/auto-model-router/config/plan-a.json, plan-b.json, plan-c.json — these were updated 2026-05-20 with latest models. Store plan configs in src/config/. Return: { model, category, confidence, reason, estimated_cost_per_1M, plan_used }."
 FEATURES[28]="model_config:Add a model_config MCP tool. Input: action (list|switch|set|reset). For list: return current plan + all categories→model mapping + available plans. For switch: switch active plan (A/B/C). For set: override a specific category's model (e.g., set high_logic primary to anthropic/claude-opus-4-7). For reset: reset to plan defaults. Store config in a model_config SQLite table (plan, category, primary_model, fallback_model, updated_at). On first run, seed from plan-b.json (default). Return current config. This is pure CRUD — no LLM."
 # Phase 6: Integration (shifted from #26)
-FEATURES[29]="integration_review:INTEGRATION CONSISTENCY REVIEW. This is the FINAL combine step. Read ALL source files in /home/administrator/task-orchestrator/src/. Check for: 1) Duplicate function/variable names across files 2) Inconsistent naming patterns 3) All enum values consistent across types.ts and state-machine.ts 4) All tools properly registered in index.ts (import + ListTools + CallTool switch) — should now be 28+ tools 5) No orphaned imports 6) Error handling patterns consistent 7) Model router config files present and valid in src/config/ 8) All Phase 5+5.5 features properly integrated. Fix ALL issues. Build must pass. Score >= 98."
+FEATURES[29]="integration_review:INTEGRATION CONSISTENCY REVIEW. This is the FINAL combine step. Read ALL source files in /home/administrator/agent-pilot/src/. Check for: 1) Duplicate function/variable names across files 2) Inconsistent naming patterns 3) All enum values consistent across types.ts and state-machine.ts 4) All tools properly registered in index.ts (import + ListTools + CallTool switch) — should now be 28+ tools 5) No orphaned imports 6) Error handling patterns consistent 7) Model router config files present and valid in src/config/ 8) All Phase 5+5.5 features properly integrated. Fix ALL issues. Build must pass. Score >= 98."
 # Phase 7: Deployment Readiness (shifted from #27-29)
-FEATURES[30]="e2e_test:Write a comprehensive end-to-end MCP test script at /home/administrator/task-orchestrator/test/test-all.ts. Test ALL tools including model router. Full workflow: task_plan -> model_classify -> model_route -> task_next -> task_update -> task_snapshot -> task_next(mode=reviewer) -> task_update(approved) -> task_reflect -> data_integrity_check -> system_info -> task_archive. Test model_config: list/switch/set/reset. Output PASS/FAIL for each of the 28+ tools. Add npm test command."
-FEATURES[31]="documentation:Write README.md at /home/administrator/task-orchestrator/README.md. Must include: 1) Project overview with Infrastructure Moat First + Model Router design philosophy 2) Quick start 3) Full API reference — all 28+ tools 4) State machine diagram 5) Dual-review workflow 6) Model Router section: Plan A/B/C, how to switch, cost savings estimate 7) Architecture section: why SQLite+state machine+FTS5+rule engine cannot be absorbed by model updates 8) How to register in Claude Code and OpenCode."
-FEATURES[32]="package_finalization:Finalize for deployment. 1) Update package.json version to 1.0.0, add description, keywords (mcp,task-orchestrator,ai-agent,infrastructure,sqlite,model-router), repository URL 2) Add scripts: test, lint, dev 3) Final npm run build 4) Final review: read ALL files, verify infrastructure moat + model router design principle evident, final score >= 98 5) Write CHANGELOG.md summarizing all 32 features across 7 phases 6) Confirm deploy-ready: git tag v1.0.0"
+FEATURES[30]="e2e_test:Write a comprehensive end-to-end MCP test script at /home/administrator/agent-pilot/test/test-all.ts. Test ALL tools including model router. Full workflow: task_plan -> model_classify -> model_route -> task_next -> task_update -> task_snapshot -> task_next(mode=reviewer) -> task_update(approved) -> task_reflect -> data_integrity_check -> system_info -> task_archive. Test model_config: list/switch/set/reset. Output PASS/FAIL for each of the 28+ tools. Add npm test command."
+FEATURES[31]="documentation:Write README.md at /home/administrator/agent-pilot/README.md. Must include: 1) Project overview with Infrastructure Moat First + Model Router design philosophy 2) Quick start 3) Full API reference — all 28+ tools 4) State machine diagram 5) Dual-review workflow 6) Model Router section: Plan A/B/C, how to switch, cost savings estimate 7) Architecture section: why SQLite+state machine+FTS5+rule engine cannot be absorbed by model updates 8) How to register in Claude Code and OpenCode."
+FEATURES[32]="package_finalization:Finalize for deployment. 1) Update package.json version to 1.0.0, add description, keywords (mcp,agent-pilot,ai-agent,infrastructure,sqlite,model-router), repository URL 2) Add scripts: test, lint, dev 3) Final npm run build 4) Final review: read ALL files, verify infrastructure moat + model router design principle evident, final score >= 98 5) Write CHANGELOG.md summarizing all 32 features across 7 phases 6) Confirm deploy-ready: git tag v1.0.0"
 
 # ─── Parse args ───
 MODE="all"
@@ -130,7 +130,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
   echo "Initializing git repository..."
   git init
   git add -A
-  git commit -m "initial: Task Orchestrator MCP Server v1.0.0 (features 1-8 done)"
+  git commit -m "initial: AgentPilot MCP Server v1.0.0 (features 1-8 done)"
 fi
 
 # ─── Main ───
@@ -285,6 +285,6 @@ if [[ $SUCCESS -eq $TOTAL ]]; then
   # Check if feature 25 is in the completed list
   if echo "$COMPLETED" | grep -q "32" || [[ $f -eq 32 ]]; then
     echo "  🚀 DEPLOYABLE! v1.0.0 is ready."
-    echo "  Run: cd ~/task-orchestrator && npm start"
+    echo "  Run: cd ~/agent-pilot && npm start"
   fi
 fi

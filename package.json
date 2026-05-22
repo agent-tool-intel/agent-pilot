@@ -1,11 +1,11 @@
 {
-  "name": "task-orchestrator",
+  "name": "agent-pilot",
   "version": "1.0.0",
   "description": "MCP server providing AI agents with persistent, auditable task infrastructure — stateful task engine + AI-native tool registry + zero-LLM Model Router via SQLite",
-  "keywords": ["mcp", "task-orchestrator", "ai-agent", "infrastructure", "sqlite", "model-router", "state-machine", "fts5", "model-context-protocol"],
+  "keywords": ["mcp", "agent-pilot", "ai-agent", "infrastructure", "sqlite", "model-router", "state-machine", "fts5", "model-context-protocol"],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anomalyco/task-orchestrator.git"
+    "url": "git+https://github.com/anomalyco/agent-pilot.git"
   },
   "license": "MIT",
   "type": "module",

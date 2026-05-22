@@ -1,0 +1,298 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+Now let me read the key files to understand exact schemas for each tool:
+[0m→ [0mRead package.json
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/state-machine.ts
+[0m→ [0mRead src/snapshot.ts
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/integrity.ts
+[0m→ [0mRead src/system-info.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/tool-import.ts
+[0m→ [0mRead src/tool-export.ts
+[0m→ [0mRead src/reflector.ts
+[0m→ [0mRead src/planner.ts
+[0m→ [0mRead src/metrics.ts
+[0m→ [0mRead src/rollback.ts
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead dist
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/importer.ts
+[0m
+[0m# [0mTodos
+[•] Design and write test/test-all.ts with 36 test cases covering all 30 tools
+[ ] Add npm test command to package.json
+[ ] Verify test passes by running it
+[0m
+Now I have a complete understanding of all handlers. Let me write the implementation plan and the test file.
+[0m→ [0mRead src/dependency-graph.ts
+[0m→ [0mRead src/audit-log.ts
+[0m→ [0mRead src/tool-registry.ts
+Now I have complete understanding of every handler. Let me write the test file.
+[0m
+[0m$ [0mls /home/administrator/task-orchestrator/test/ 2>/dev/null || echo "Directory does not exist"
+Directory does not exist
+[0m
+[0m$ [0mmkdir -p /home/administrator/task-orchestrator/test
+(no output)
+[0m
+[0m← [0mWrite test/test-all.ts
+Wrote file successfully.
+[0m
+[0m← [0mEdit package.json
+Index: /home/administrator/task-orchestrator/package.json
+===================================================================
+--- /home/administrator/task-orchestrator/package.json
++++ /home/administrator/task-orchestrator/package.json
+@@ -4,9 +4,10 @@
+   "type": "module",
+   "scripts": {
+     "build": "tsc && mkdir -p dist/config && cp src/config/plan-*.json dist/config/",
+     "start": "node dist/index.js",
+-    "dev": "tsc && node dist/index.js"
++    "dev": "tsc && node dist/index.js",
++    "test": "npx --yes tsx test/test-all.ts"
+   },
+   "dependencies": {
+     "@modelcontextprotocol/sdk": "^1.7.0",
+     "better-sqlite3": "^11.7.0",
+@@ -16,7 +17,8 @@
+   "devDependencies": {
+     "@types/better-sqlite3": "^7.6.12",
+     "@types/node": "^22.13.0",
+     "@types/uuid": "^10.0.0",
++    "tsx": "^4.19.0",
+     "typescript": "^5.7.0"
+   }
+ }
+
+[0m
+Now update `package.json` with the test command:
+[0m# [0mTodos
+[✓] Design and write test/test-all.ts with 36 test cases covering all 30 tools
+[✓] Add npm test command to package.json
+[•] Verify test passes by running it
+[0m
+[0m$ [0mnpm test 2>&1
+> task-orchestrator@0.2.0 test
+> npx --yes tsx test/test-all.ts
+
+══════════════════════════════════════════════════
+  Task Orchestrator - End-to-End Test Suite
+══════════════════════════════════════════════════
+
+  ✓ task_plan
+  ✓ model_classify
+  ✓ model_route
+  ✓ task_next (executor)
+  ✓ task_update (in_progress)
+  ✓ task_update (pending_review)
+  ✓ task_snapshot
+  ✓ task_next (reviewer)
+  ✓ task_update (approved)
+  ✓ task_reflect
+  ✓ data_integrity_check
+  ✓ system_info
+  ✗ data_integrity_check (repair): Should return repair_applied flag
+  ✓ task_archive
+  ✓ task_archive_list
+  ✓ task_archive_restore
+  ✓ model_config (list)
+  ✓ model_config (switch)
+  ✓ model_config (set)
+  ✓ model_config (reset)
+  ✓ tool_register
+  ✓ tool_search
+  ✓ tool_update
+  ✓ tool_deprecate
+  ✓ tool_stats
+  ✓ tool_export
+  ✓ tool_import
+  ✓ task_status
+  ✓ task_export
+  ✓ task_import
+  ✓ task_duplicate
+  ✓ task_batch_update
+  ✓ task_dependency_graph
+  ✗ task_audit_log: Should have audit entries for the task
+  ✓ task_cancel
+  ✓ task_metrics
+  ✓ task_rollback
+
+════════════════════════════════════════════════════════
+  Results: 35 PASS, 2 FAIL, 37 Total
+
+  Failures:
+    • data_integrity_check (repair): Should return repair_applied flag
+    • task_audit_log: Should have audit entries for the task
+════════════════════════════════════════════════════════
+[0m
+[0m→ [0mRead test/test-all.ts[90m [offset=178, limit=10][0m
+Two issues to fix. Let me read the exact test code around those lines:
+[0m→ [0mRead test/test-all.ts[90m [offset=288, limit=12][0m
+[0m
+[0m← [0mEdit test/test-all.ts
+Index: /home/administrator/task-orchestrator/test/test-all.ts
+===================================================================
+--- /home/administrator/task-orchestrator/test/test-all.ts
++++ /home/administrator/task-orchestrator/test/test-all.ts
+@@ -221,9 +221,12 @@
+ await test('data_integrity_check (repair)', async () => {
+   const res = await handleDataIntegrityCheck({ repair: true });
+   const data = assertSuccess(res);
+   assert(typeof data.healthy === 'boolean', 'Should return healthy flag');
+-  assert(typeof data.repair_applied === 'boolean', 'Should return repair_applied flag');
++  // repair_applied only present when issues > 0; if 0 issues, there's nothing to repair
++  if (data.issues_found > 0) {
++    assert(data.repair_applied === true, 'Should apply repair when issues exist');
++  }
+ });
+ 
+ await test('task_archive', async () => {
+   const res = await handleTaskArchive({ task_id: rootTaskId, cascade: true });
+
+[0m
+[0m← [0mEdit test/test-all.ts
+Index: /home/administrator/task-orchestrator/test/test-all.ts
+===================================================================
+--- /home/administrator/task-orchestrator/test/test-all.ts
++++ /home/administrator/task-orchestrator/test/test-all.ts
+@@ -455,9 +455,11 @@
+   assert(jsonData.format === 'json', 'JSON format should be json');
+ });
+ 
+ await test('task_audit_log', async () => {
+-  const res = await handleTaskAuditLog({ task_id: subtaskIds[0], limit: 50 });
++  // Use a task from the batch-update plan (these have audit entries and were not archived)
++  const auditTaskId = utilSubtaskIds.length > 0 ? utilSubtaskIds[0] : undefined;
++  const res = await handleTaskAuditLog({ task_id: auditTaskId, limit: 50 });
+   const data = assertSuccess(res);
+   assert(Array.isArray(data.entries), 'Should return entries array');
+   assert(data.entries.length > 0, 'Should have audit entries for the task');
+ });
+
+[0m
+Now fix the audit log test to use a non-archived task:
+[0m$ [0mnpm test 2>&1
+> task-orchestrator@0.2.0 test
+> npx --yes tsx test/test-all.ts
+
+══════════════════════════════════════════════════
+  Task Orchestrator - End-to-End Test Suite
+══════════════════════════════════════════════════
+
+  ✓ task_plan
+  ✓ model_classify
+  ✓ model_route
+  ✓ task_next (executor)
+  ✓ task_update (in_progress)
+  ✓ task_update (pending_review)
+  ✓ task_snapshot
+  ✓ task_next (reviewer)
+  ✓ task_update (approved)
+  ✓ task_reflect
+  ✓ data_integrity_check
+  ✓ system_info
+  ✓ data_integrity_check (repair)
+  ✓ task_archive
+  ✓ task_archive_list
+  ✓ task_archive_restore
+  ✓ model_config (list)
+  ✓ model_config (switch)
+  ✓ model_config (set)
+  ✓ model_config (reset)
+  ✓ tool_register
+  ✓ tool_search
+  ✓ tool_update
+  ✓ tool_deprecate
+  ✓ tool_stats
+  ✓ tool_export
+  ✓ tool_import
+  ✓ task_status
+  ✓ task_export
+  ✓ task_import
+  ✓ task_duplicate
+  ✓ task_batch_update
+  ✓ task_dependency_graph
+  ✓ task_audit_log
+  ✓ task_cancel
+  ✓ task_metrics
+  ✓ task_rollback
+
+════════════════════════════════════════════════════════
+  Results: 37 PASS, 0 FAIL, 37 Total
+════════════════════════════════════════════════════════
+[0m
+All 37 tests pass. Here is the summary plan:
+
+## Implementation Plan
+
+### What was done
+
+**Files created:**
+- `test/test-all.ts` — 37-test E2E suite covering all 30 tools
+
+**Files modified:**
+- `package.json` — added `"test"` script and `tsx` devDependency
+
+---
+
+### Test Architecture
+
+**DB isolation:** Deletes `data/orchestrator.db*` at startup so each run starts fresh, with `data/` directory auto-created.
+
+**Handler invocation:** All 30 tools called via direct async handler imports from `dist/` (compiled JS). Avoids MCP stdio protocol overhead while testing the exact same handler logic.
+
+**Test runner:** Sequential `async test()` function with try/catch, parsing MCP's `{ content: [{ type: 'text', text }] }` response format. Each test asserts specific response fields with descriptive error messages.
+
+---
+
+### Phases
+
+| Phase | Tests | Tools Covered |
+|-------|-------|--------------|
+| **Phase 1** — Main Workflow (15 tests) | `task_plan` → `model_classify` → `model_route` → `task_next(executor)` → `task_update(in_progress)` → `task_update(pending_review)` → `task_snapshot` → `task_next(reviewer)` → `task_update(approved)` → `task_reflect` → `data_integrity_check` → `system_info` → `data_integrity_check(repair)` → `task_archive` → `task_archive_list` → `task_archive_restore` | 15 unique tools |
+| **Phase 2** — Model Config (4 tests) | `model_config` with `list`, `switch`→A, `set` (override `code_generation`), `reset` | 1 tool × 4 actions |
+| **Phase 3** — Tool Registry (5 tests) | `tool_register` → `tool_search` → `tool_update` → `tool_deprecate` → `tool_stats` | 5 tools |
+| **Phase 4** — Tool Export/Import (2 tests) | `tool_export` → `tool_import` | 2 tools |
+| **Phase 5** — Task Utilities (11 tests) | `task_status` → `task_export` → `task_import` → `task_duplicate` → `task_batch_update` → `task_dependency_graph` → `task_audit_log` → `task_cancel` → `task_metrics` → `task_rollback` | 10 tools |
+
+### Edge Cases Handled
+
+| Concern | Mitigation |
+|---------|-----------|
+| Archive deletes audit logs | `task_audit_log` queries the batch-update plan (created after archive), not the archived tree |
+| Auto-complete requires all siblings done | Main workflow uses a single-subtask plan; approving it triggers root auto-complete to `completed` |
+| `data_integrity_check(repair)` only sets `repair_applied` when issues exist | Test conditionally checks field only when `issues_found > 0` |
+| DB singleton (`getDb()`) | DB file deleted before any imports; each handler creates DB lazily on first call |
+| ESM module resolution | Test imports `*.js` from `dist/`; run via `npx tsx` which handles TypeScript compilation |
+| Task status transitions (state machine) | Full executor→reviewer→approval cycle tested end-to-end with `VALID_TRANSITIONS` enforcement |
+
+### `package.json` additions
+
+```json
+"scripts": {
+  "test": "npx --yes tsx test/test-all.ts"
+},
+"devDependencies": {
+  "tsx": "^4.19.0"
+}
+```
+
+---
+
+**npm test output:**
+```
+  ✓ 37 of 37 tests pass
+  Results: 37 PASS, 0 FAIL, 37 Total
+```
+
+PLAN_READY

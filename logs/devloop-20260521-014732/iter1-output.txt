@@ -1,0 +1,223 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m→ [0mRead src
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/metrics.ts
+[0m→ [0mRead src/model-router.ts[90m [limit=30][0m
+Let me also check the `metrics.ts` for pattern reference, and the `model-router.ts` since it has the dynamic table detection pattern mentioned in the plan.
+[0m
+[0m# [0mTodos
+[•] Create src/system-info.ts with handleSystemInfo function
+[ ] Register system_info tool in src/index.ts
+[ ] Build and fix errors
+[ ] Review with explore agent
+[0m
+[0m← [0mWrite src/system-info.ts
+Wrote file successfully.
+[0m
+[0m← [0mEdit src/index.ts
+Index: /home/administrator/task-orchestrator/src/index.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/index.ts
++++ /home/administrator/task-orchestrator/src/index.ts
+@@ -21,8 +21,9 @@
+ import { handleModelClassify, handleModelRoute, handleModelConfig } from './model-router.js';
+ import { handleTaskAuditLog } from './audit-log.js';
+ import { handleTaskMetrics } from './metrics.js';
+ import { handleTaskRollback } from './rollback.js';
++import { handleSystemInfo } from './system-info.js';
+ 
+ const server = new Server(
+   { name: 'task-orchestrator', version: '0.2.0' },
+   { capabilities: { tools: {} } },
+
+[0m
+Now I'll create the new file and modify index.ts in parallel.
+[0m← [0mEdit src/index.ts
+Index: /home/administrator/task-orchestrator/src/index.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/index.ts
++++ /home/administrator/task-orchestrator/src/index.ts
+@@ -323,8 +323,16 @@
+         },
+         required: ['task_id'],
+       },
+     },
++    {
++      name: 'system_info',
++      description: 'Get database infrastructure statistics: table row counts, database file size, WAL status, and server version. Read-only introspection.',
++      inputSchema: {
++        type: 'object',
++        properties: {},
++      },
++    },
+     ],
+ }));
+ 
+ server.setRequestHandler(CallToolRequestSchema, async (request) => {
+
+[0m
+[0m← [0mEdit src/index.ts
+Index: /home/administrator/task-orchestrator/src/index.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/index.ts
++++ /home/administrator/task-orchestrator/src/index.ts
+@@ -363,8 +363,9 @@
+     case 'task_audit_log': return await handleTaskAuditLog(args);
+     case 'task_metrics':  return await handleTaskMetrics(args);
+     case 'task_rollback': return await handleTaskRollback(args);
+     case 'task_snapshot': return await handleTaskSnapshot(args);
++    case 'system_info':  return await handleSystemInfo(args);
+     default:
+       return { content: [{ type: 'text', text: JSON.stringify({ error: 'Unknown tool: ' + name }) }], isError: true };
+   }
+ } catch (err) {
+
+[0m
+[0m# [0mTodos
+[✓] Create src/system-info.ts with handleSystemInfo function
+[✓] Register system_info tool in src/index.ts
+[•] Build and fix errors
+[ ] Review with explore agent
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+
+src/system-info.ts(41,40): error TS2339: Property 'length' does not exist on type '{}'.
+src/system-info.ts(42,19): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type '{}'.
+  Property '0' does not exist on type '{}'.
+[0m
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -36,11 +36,11 @@
+ const shmExists = existsSync(DB_PATH + '-shm');
+ 
+ let walCheckpointPages: number | null = null;
+ try {
+-  const checkpointRow = db.pragma('wal_checkpoint(PASSIVE)');
+-  if (checkpointRow && checkpointRow.length > 0) {
+-    const row = checkpointRow[0] as Record<string, unknown>;
++  const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as unknown as Record<string, unknown>[];
++  if (checkpointRows && checkpointRows.length > 0) {
++    const row = checkpointRows[0];
+     walCheckpointPages = Number(row['wal_checkpoint_pages'] ?? row['busy'] ?? row['log'] ?? 0);
+   }
+ } catch {
+   walCheckpointPages = null;
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Create src/system-info.ts with handleSystemInfo function
+[✓] Register system_info tool in src/index.ts
+[✓] Build and fix errors
+[•] Review with explore agent
+[0m
+[0m• [0mReview system_info implementation[90m Explore Agent[0m
+Build passed. Now let me run the review.
+[0m✓ [0mReview system_info implementation[90m Explore Agent[0m
+[0m
+[0m← [0mEdit src/db.ts
+Index: /home/administrator/task-orchestrator/src/db.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/db.ts
++++ /home/administrator/task-orchestrator/src/db.ts
+@@ -2,9 +2,9 @@
+ import path from 'path';
+ import { fileURLToPath } from 'url';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const DB_PATH = path.resolve(__dirname, '../data/orchestrator.db');
++export const DB_PATH = path.resolve(__dirname, '../data/orchestrator.db');
+ 
+ let db: Database.Database | null = null;
+ 
+ export function getDb(): Database.Database {
+
+[0m
+Good review. Let me fix the two medium-severity issues found: DB_PATH duplication and incorrect WAL column names.
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -1,13 +1,8 @@
+-import { getDb } from './db.js';
++import { getDb, DB_PATH } from './db.js';
+ import { toMCPResponse } from './types.js';
+ import { statSync, existsSync } from 'fs';
+-import path from 'path';
+-import { fileURLToPath } from 'url';
+ 
+-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const DB_PATH = path.resolve(__dirname, '../data/orchestrator.db');
+-
+ export async function handleSystemInfo(_args: unknown) {
+   const db = getDb();
+ 
+   const totalTasks = (db.prepare(
+
+[0m
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -34,9 +34,9 @@
+ try {
+   const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as unknown as Record<string, unknown>[];
+   if (checkpointRows && checkpointRows.length > 0) {
+     const row = checkpointRows[0];
+-    walCheckpointPages = Number(row['wal_checkpoint_pages'] ?? row['busy'] ?? row['log'] ?? 0);
++    walCheckpointPages = Number(row['checkpointed'] ?? row['log'] ?? row['busy'] ?? 0);
+   }
+ } catch {
+   walCheckpointPages = null;
+ }
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/system-info.ts
+Build passed. Let me verify the final files and do a quick sanity check.
+[0m
+[0m$ [0mnpm run build 2>&1 && echo "BUILD_OK"
+> task-orchestrator@0.1.0 build
+> tsc
+
+BUILD_OK
+[0m
+[0m→ [0mRead src/db.ts[90m [limit=10][0m
+[0m→ [0mRead src/index.ts[90m [limit=30, offset=24][0m
+[0m→ [0mRead src/index.ts[90m [limit=15, offset=325][0m
+[0m→ [0mRead src/index.ts[90m [limit=10, offset=365][0m
+[0m
+[0m# [0mTodos
+[✓] Create src/system-info.ts with handleSystemInfo function
+[✓] Register system_info tool in src/index.ts
+[✓] Build and fix errors
+[✓] Review with explore agent
+[0m
+SCORE: 92/100
+
+REVIEW_COMPLETE
+
+**Changes made:**
+- **`src/system-info.ts`** (new) — `handleSystemInfo` function queries DB for total tasks/tools/snapshots, file size, WAL status, table row counts, audit log entries, server version
+- **`src/db.ts`** — Exported `DB_PATH` (previously private `const`)
+- **`src/index.ts`** — Added import, tool definition (no-params, read-only), and switch case
+
+**Review fixes applied:** DB_PATH now imported from `db.ts` (no duplication), WAL column lookup fixed to use correct `checkpointed`/`log`/`busy` columns. Build passes clean.

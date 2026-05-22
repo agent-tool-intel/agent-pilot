@@ -1,0 +1,165 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m→ [0mRead .
+[0m→ [0mRead package.json
+[0m• [0mExplore full codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore full codebase structure[90m Explore Agent[0m
+[0m→ [0mRead README.md
+[0m→ [0mRead ROADMAP.md
+[0m→ [0mRead build-all.sh
+[0m→ [0mRead src/index.ts
+Now I have a complete picture. Let me verify version references across the codebase:
+[0m✱ [0mGrep "0\.2\.0"[90m in . · 64 matches[0m
+Here is the detailed implementation plan:
+
+---
+
+## Deployment Finalization Plan
+
+### Files to Modify (7 files) + 1 new file
+
+---
+
+### 1. `package.json` — Update manifest for v1.0.0
+
+| Change | Location | Old | New |
+|--------|----------|-----|-----|
+| Version | line 3 | `"0.2.0"` | `"1.0.0"` |
+| Add description | after version | — | `"description": "MCP server providing AI agents with persistent, auditable task infrastructure — stateful task engine + AI-native tool registry + zero-LLM Model Router via SQLite"` |
+| Add keywords | after description | — | `"keywords": ["mcp", "task-orchestrator", "ai-agent", "infrastructure", "sqlite", "model-router", "state-machine", "ft5", "model-context-protocol"]` |
+| Add repository | after keywords | — | `"repository": { "type": "git", "url": "git+https://github.com/anomalyco/task-orchestrator.git" }` |
+| Add license | after repository | — | `"license": "MIT"` |
+| Add lint script | after scripts.start | — | `"lint": "tsc --noEmit"` |
+| Keep existing: test, build, start, dev | unchanged | — | — |
+
+---
+
+### 2. `src/index.ts` — Update server version strings
+
+| Line | Old | New |
+|------|-----|-----|
+| 30 | `version: '0.2.0'` | `version: '1.0.0'` |
+| 470 | `v0.2.0` | `v1.0.0` |
+
+---
+
+### 3. `src/system-info.ts` — Update version string
+
+| Line | Old | New |
+|------|-----|-----|
+| 59 | `version: '0.2.0'` | `version: '1.0.0'` |
+
+---
+
+### 4. `test/test-all.ts` — Update version assertion
+
+| Line | Old | New |
+|------|-----|-----|
+| 301 | `'0.2.0'` | `'1.0.0'` |
+
+---
+
+### 5. `README.md` — Update version badge
+
+| Line | Old | New |
+|------|-----|-----|
+| 374 | `**Version:** 0.2.0` | `**Version:** 1.0.0` |
+
+---
+
+### 6. `build-all.sh` — Update version in initial commit message
+
+| Line | Old | New |
+|------|-----|-----|
+| 133 | `v0.2.0` | `v1.0.0` |
+
+---
+
+### 7. `CHANGELOG.md` — **NEW FILE**
+
+Summarize all 32 features across 7 phases, structured as:
+
+```
+# Changelog
+
+## v1.0.0 (2026-05-21)
+
+### Phase 1: Core Engine (Features #1-7)
+- task_plan — goal storage & subtask tree creation in SQLite
+- task_next — dual-mode executor/reviewer next-action picker
+- task_update — state transition engine with parent auto-cascade
+- task_reflect — heuristic execution history & suggestion engine (zero LLM)
+- task_status — flat/tree task viewer via recursive CTE
+- tool_register — AI-native tool registry with FTS5 sync
+- tool_search — full-text search via FTS5 with relevance ranking + tag filtering
+
+### Phase 2: Task Lifecycle (Features #8-13)
+- task_cancel — cancel task with optional cascade to descendants
+- task_export — recursive task tree export to JSON/CSV
+- task_import — transactional JSON import with ID remapping
+- task_duplicate — deep-clone task tree with new UUIDs, reset to pending
+- task_batch_update — multi-task transition with partial success
+- task_dependency_graph — Mermaid/ASCII/JSON dependency visualization
+
+### Phase 3: Tool Registry Enhancement (Features #14-18)
+- tool_update — partial metadata update with FTS5 re-sync
+- tool_deprecate — deprecation with [DEPRECATED] prefix + FTS5 removal
+- tool_export — bulk tool registry export to JSON
+- tool_import — bulk tool import with merge/replace modes
+- tool_stats — registry statistics: per-provider, top tags, recent additions
+
+### Phase 4: Quality & Accountability (Features #19-21)
+- task_audit_log — automatic status change history via SQLite trigger
+- task_metrics — aggregate cross-tree metrics: completion rate, avg time, failure analysis
+- task_rollback — status revert using audit log (non-terminal only)
+
+### Phase 5: Data Lifecycle (Features #22-25)
+- task_snapshot — point-in-time task tree snapshot for versioning
+- system_info — database introspection: row counts, file size, WAL status
+- data_integrity_check — 10-category scan with auto-repair
+- task_archive / task_archive_list / task_archive_restore — full archive lifecycle
+
+### Phase 5.5: Model Router (Features #26-28)
+- model_classify — zero-LLM keyword-based classification into 8 categories
+- model_route — plan-based model selection with fallback chain (Plans A/B/C)
+- model_config — CRUD management of routing config, plan switching, overrides
+
+### Phase 6: Integration (Feature #29)
+- Cross-feature consistency review — naming, typing, error handling, import hygiene
+
+### Phase 7: Deployment Readiness (Features #30-32)
+- End-to-end MCP test suite (905 lines, 30+ tools)
+- Comprehensive README with architecture, API reference, state machine, cost analysis
+- Package finalization: version 1.0.0, npm scripts, build verification, git tag
+```
+
+---
+
+### Execution Steps (Sequential)
+
+1. **Edit `package.json`** — version, description, keywords, repository, license, lint script
+2. **Edit `src/index.ts`** — update two version strings
+3. **Edit `src/system-info.ts`** — update version string
+4. **Edit `test/test-all.ts`** — update version assertion
+5. **Edit `README.md`** — update version line
+6. **Edit `build-all.sh`** — update version string
+7. **Create `CHANGELOG.md`** — full 32-feature changelog
+8. **Run `npm run build`** — verify TypeScript compilation + config copy succeeds
+9. **Run `npm test`** — verify all 30 tools pass E2E (ensures no regression from version bump)
+10. **Final review** — read critical architecture files to confirm "Infrastructure Moat First" + "Model Router" design principles are evident
+11. **`git tag v1.0.0`** — tag the deployable release
+
+### Edge Cases Considered
+
+- **dist/ files** are build artifacts; will be regenerated — no manual edits needed
+- **node_modules/ version references** are third-party dependencies — not changed
+- **db.ts comment (`v0.2.0+`)** refers to migration version, not project version — keep as-is
+- **README.md** has placeholder `https://github.com/your-org/task-orchestrator.git` for git clone — update to match repo URL
+- **build-all.sh line 133** initial commit message has `v0.2.0` — cosmetic but should match
+- **`npm run lint`** uses `tsc --noEmit` — no extra devDependencies needed, works with existing TypeScript install
+- All version strings must be kept consistent across all 7 files to avoid confusion
+
+---
+
+PLAN_READY

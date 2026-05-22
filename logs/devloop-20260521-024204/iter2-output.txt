@@ -1,0 +1,527 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m• [0mExplore task archive code[90m Explore Agent[0m
+[0m✓ [0mExplore task archive code[90m Explore Agent[0m
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/types.ts
+Let me read the implementation files to identify the issues.
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead dist/archiver.js
+[0m→ [0mRead package.json
+Now let me look at other similar tools for comparison, and check the compiled output:
+Let me run the build to see what errors exist:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m✱ [0mGrep "TODO|FIXME|HACK|BUG|ISSUE|REVIEW|archiv"[90m in src · 36 matches[0m
+[0m
+[0m$ [0mls -la /home/administrator/task-orchestrator/dist/
+total 316
+drwxr-xr-x 2 administrator administrator  4096 May 21 02:53 .
+drwxr-xr-x 8 administrator administrator  4096 May 20 22:45 ..
+-rw-r--r-- 1 administrator administrator   536 May 21 03:16 archiver.d.ts
+-rw-r--r-- 1 administrator administrator  7359 May 21 03:16 archiver.js
+-rw-r--r-- 1 administrator administrator   176 May 21 03:16 audit-log.d.ts
+-rw-r--r-- 1 administrator administrator   571 May 21 03:16 audit-log.js
+-rw-r--r-- 1 administrator administrator   179 May 21 03:16 batch-updater.d.ts
+-rw-r--r-- 1 administrator administrator  2416 May 21 03:16 batch-updater.js
+-rw-r--r-- 1 administrator administrator   174 May 21 03:16 canceller.d.ts
+-rw-r--r-- 1 administrator administrator  2188 May 21 03:16 canceller.js
+-rw-r--r-- 1 administrator administrator   253 May 21 03:16 db.d.ts
+-rw-r--r-- 1 administrator administrator  4617 May 21 03:16 db.js
+-rw-r--r-- 1 administrator administrator   183 May 21 03:16 dependency-graph.d.ts
+-rw-r--r-- 1 administrator administrator  5610 May 21 03:16 dependency-graph.js
+-rw-r--r-- 1 administrator administrator   177 May 21 03:16 duplicator.d.ts
+-rw-r--r-- 1 administrator administrator  3286 May 21 03:16 duplicator.js
+-rw-r--r-- 1 administrator administrator   174 May 21 03:16 exporter.d.ts
+-rw-r--r-- 1 administrator administrator  4909 May 21 03:16 exporter.js
+-rw-r--r-- 1 administrator administrator   174 May 21 03:16 importer.d.ts
+-rw-r--r-- 1 administrator administrator  3626 May 21 03:16 importer.js
+-rw-r--r-- 1 administrator administrator    11 May 21 03:16 index.d.ts
+-rw-r--r-- 1 administrator administrator 21818 May 21 03:16 index.js
+-rw-r--r-- 1 administrator administrator   182 May 21 03:16 integrity.d.ts
+-rw-r--r-- 1 administrator administrator 10281 May 21 03:16 integrity.js
+-rw-r--r-- 1 administrator administrator   176 May 21 03:16 metrics.d.ts
+-rw-r--r-- 1 administrator administrator  3543 May 21 03:16 metrics.js
+-rw-r--r-- 1 administrator administrator   526 May 21 03:16 model-router.d.ts
+-rw-r--r-- 1 administrator administrator 16909 May 21 03:16 model-router.js
+-rw-r--r-- 1 administrator administrator   346 May 21 03:16 planner.d.ts
+-rw-r--r-- 1 administrator administrator  4870 May 21 03:16 planner.js
+-rw-r--r-- 1 administrator administrator   175 May 21 03:16 reflector.d.ts
+-rw-r--r-- 1 administrator administrator  4530 May 21 03:16 reflector.js
+-rw-r--r-- 1 administrator administrator   176 May 21 03:16 rollback.d.ts
+-rw-r--r-- 1 administrator administrator  2005 May 21 03:16 rollback.js
+-rw-r--r-- 1 administrator administrator   176 May 21 03:16 snapshot.d.ts
+-rw-r--r-- 1 administrator administrator  2503 May 21 03:16 snapshot.js
+-rw-r--r-- 1 administrator administrator   412 May 21 03:16 state-machine.d.ts
+-rw-r--r-- 1 administrator administrator  6272 May 21 03:16 state-machine.js
+-rw-r--r-- 1 administrator administrator   175 May 21 03:16 system-info.d.ts
+-rw-r--r-- 1 administrator administrator  2471 May 21 03:16 system-info.js
+-rw-r--r-- 1 administrator administrator   174 May 21 03:16 tool-export.d.ts
+-rw-r--r-- 1 administrator administrator  1069 May 21 03:16 tool-export.js
+-rw-r--r-- 1 administrator administrator   174 May 21 03:16 tool-import.d.ts
+-rw-r--r-- 1 administrator administrator  3754 May 21 03:16 tool-import.js
+-rw-r--r-- 1 administrator administrator   875 May 21 03:16 tool-registry.d.ts
+-rw-r--r-- 1 administrator administrator  9140 May 21 03:16 tool-registry.js
+-rw-r--r-- 1 administrator administrator 32853 May 21 03:16 types.d.ts
+-rw-r--r-- 1 administrator administrator 13491 May 21 03:16 types.js
+[0m
+Let me search for any review notes, TODO comments, or known issues in the codebase:
+[0m→ [0mRead dist/archiver.d.ts
+[0m→ [0mRead tsconfig.json
+[0m
+[0m# [0mTodos
+[•] Fix: Add child status validation in cascade archive mode (root check only, children silently archived)
+[ ] Fix: Clean up orphan depends_on references after archive
+[ ] Fix: Add archived_at to archive response
+[ ] Fix: Add cascade to restore response
+[ ] Fix: Inefficient conflict check - use IN query in restore
+[ ] Fix: Add cycle guard to computeDepth
+[ ] Build: Run npm run build and verify
+[ ] Review: Call explore agent to review fixes
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Now I have a thorough understanding. Let me identify and fix the issues I've found. Here's my analysis of problems in the archive feature:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -43,23 +43,34 @@
+       SELECT * FROM tasks WHERE id IN (SELECT id FROM subtree)
+     `).all(input.task_id) as TaskRow[]
+   : [task];
+ 
++const nonArchivable = allTasks.filter(t => !ARCHIVABLE_STATUSES.includes(t.status));
++if (nonArchivable.length > 0) {
++  return toMCPResponse({
++    error: 'Cannot archive tree: ' + nonArchivable.length + ' task(s) have non-archivable statuses: ' +
++      nonArchivable.map(t => t.id + ' (' + t.status + ')').join(', '),
++  });
++}
++
++const allTaskIds = allTasks.map(t => t.id);
++
+ const depthCache = new Map<string, number>();
+ 
+-function computeDepth(id: string, parentId: string | null): number {
++function computeDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
+   const cached = depthCache.get(id);
+   if (cached !== undefined) return cached;
+-  if (!parentId) {
++  if (visited.has(id) || !parentId) {
+     depthCache.set(id, 0);
+     return 0;
+   }
++  visited.add(id);
+   const parent = allTasks.find(t => t.id === parentId);
+   if (!parent) {
+     depthCache.set(id, 0);
+     return 0;
+   }
+-  const d = 1 + computeDepth(parent.id, parent.parent_id);
++  const d = 1 + computeDepth(parent.id, parent.parent_id, visited);
+   depthCache.set(id, d);
+   return d;
+ }
+ 
+
+[0m
+Now let me implement all the fixes. I'll address them in one batch edit:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -90,15 +90,27 @@
+ 
+     const deleteSnapshots = db.prepare('DELETE FROM snapshots WHERE task_id = ?');
+     const deleteAuditLog = db.prepare('DELETE FROM audit_log WHERE task_id = ?');
+     const deleteTask = db.prepare('DELETE FROM tasks WHERE id = ?');
++    const getTaskDepends = db.prepare('SELECT id, depends_on FROM tasks WHERE depends_on != ?');
++    const updateDepends = db.prepare('UPDATE tasks SET depends_on = ? WHERE id = ?');
+ 
+     for (const { id } of sortedTasks) {
+       insertStmt.run(now, id);
+       deleteSnapshots.run(id);
+       deleteAuditLog.run(id);
+       deleteTask.run(id);
+     }
++
++    const archivedSet = new Set(allTaskIds);
++    const remainingTasks = getTaskDepends.all('[]') as { id: string; depends_on: string }[];
++    for (const rt of remainingTasks) {
++      const deps: string[] = JSON.parse(rt.depends_on);
++      const cleaned = deps.filter(d => !archivedSet.has(d));
++      if (cleaned.length !== deps.length) {
++        updateDepends.run(JSON.stringify(cleaned), rt.id);
++      }
++    }
+   });
+ 
+   archiveAll();
+ 
+@@ -106,8 +118,9 @@
+     archived: task.id,
+     title: task.title,
+     subtrees_archived: allTasks.length,
+     cascade: input.cascade,
++    archived_at: now,
+   });
+ }
+ 
+ const TaskArchiveListInput = z.object({
+
+[0m
+Now add the `depends_on` cleanup and `archived_at` to the response:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -180,15 +180,12 @@
+       SELECT id FROM subtree
+     `).all(input.task_id) as { id: string }[]).map(r => r.id)
+   : [input.task_id];
+ 
+-const conflicts: string[] = [];
+-for (const id of subtreeIds) {
+-  const exists = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?').get(id) as { cnt: number };
+-  if (exists.cnt > 0) {
+-    conflicts.push(id);
+-  }
+-}
++const placeholders = subtreeIds.map(() => '?').join(',');
++const conflicts = (db.prepare(
++  `SELECT id FROM tasks WHERE id IN (${placeholders})`
++).all(...subtreeIds) as { id: string }[]).map(r => r.id);
+ 
+ if (conflicts.length > 0) {
+   return toMCPResponse({
+     error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', '),
+
+[0m
+Now fix the restore function - inefficient conflict check and missing `cascade` in response:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -232,6 +232,7 @@
+   return toMCPResponse({
+     restored: task.id,
+     title: task.title,
+     subtrees_restored: subtreeIds.length,
++    cascade: input.cascade,
+   });
+ }
+
+[0m
+[0m→ [0mRead src/archiver.ts
+Let me verify the complete updated file:
+[0m
+[0m# [0mTodos
+[✓] Fix: Add child status validation in cascade archive mode (root check only, children silently archived)
+[✓] Fix: Clean up orphan depends_on references after archive
+[✓] Fix: Add archived_at to archive response
+[✓] Fix: Add cascade to restore response
+[✓] Fix: Inefficient conflict check - use IN query in restore
+[✓] Fix: Add cycle guard to computeDepth
+[•] Build: Run npm run build and verify
+[ ] Review: Call explore agent to review fixes
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Good. Now let me build:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix: Add child status validation in cascade archive mode (root check only, children silently archived)
+[✓] Fix: Clean up orphan depends_on references after archive
+[✓] Fix: Add archived_at to archive response
+[✓] Fix: Add cascade to restore response
+[✓] Fix: Inefficient conflict check - use IN query in restore
+[✓] Fix: Add cycle guard to computeDepth
+[✓] Build: Run npm run build and verify
+[•] Review: Call explore agent to review fixes
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Build passes cleanly. Now let me call the explore agent to review the fixes:
+[0m• [0mReview archive fixes[90m General Agent[0m
+[0m✓ [0mReview archive fixes[90m General Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Fix: Add child status validation in cascade archive mode
+[✓] Fix: Clean up orphan depends_on references after archive
+[✓] Fix: Add archived_at to archive response
+[✓] Fix: Add cascade to restore response
+[✓] Fix: Inefficient conflict check - use IN query in restore
+[✓] Fix: Add cycle guard to computeDepth
+[✓] Build: Run npm run build and verify
+[✓] Review: Call explore agent to review fixes
+[•] ITERATE Fix 1: Add depends_on cleanup on restore (symmetrical to archive)
+[ ] ITERATE Fix 2: Replace non-null assertion with ?? 0 in sort
+[ ] ITERATE Fix 3: Order restore subtree by depth to avoid parent-resolution issues
+[ ] ITERATE Fix 4: Improve restore conflict error message
+[ ] Build and re-review
+[ ] Output final SCORE and REVIEW_COMPLETE
+[0m
+Good review. Let me address the actionable issues:
+[0m→ [0mRead src/archiver.ts
+[0m
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -77,9 +77,9 @@
+ for (const t of allTasks) {
+   computeDepth(t.id, t.parent_id);
+ }
+ 
+-const sortedTasks = [...allTasks].sort((a, b) => depthCache.get(b.id)! - depthCache.get(a.id)!);
++const sortedTasks = [...allTasks].sort((a, b) => (depthCache.get(b.id) ?? 0) - (depthCache.get(a.id) ?? 0));
+ 
+ const now = new Date().toISOString();
+ 
+ const archiveAll = db.transaction(() => {
+
+[0m
+Now let me apply all four iteration fixes:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -171,45 +171,72 @@
+ if (!task) {
+   return toMCPResponse({ error: 'Archived task not found: ' + input.task_id });
+ }
+ 
+-const subtreeIds = input.cascade
+-  ? (db.prepare(`
++const subtreeRows = input.cascade
++  ? db.prepare(`
+       WITH RECURSIVE subtree(id) AS (
+         SELECT ? UNION ALL SELECT t.id FROM archived_tasks t JOIN subtree s ON t.parent_id = s.id
+       )
+-      SELECT id FROM subtree
+-    `).all(input.task_id) as { id: string }[]).map(r => r.id)
+-  : [input.task_id];
++      SELECT * FROM archived_tasks WHERE id IN (SELECT id FROM subtree)
++    `).all(input.task_id) as TaskRow[]
++  : [task];
+ 
++const subtreeIds = subtreeRows.map(r => r.id);
++
+ const placeholders = subtreeIds.map(() => '?').join(',');
+ const conflicts = (db.prepare(
+   `SELECT id FROM tasks WHERE id IN (${placeholders})`
+ ).all(...subtreeIds) as { id: string }[]).map(r => r.id);
+ 
+ if (conflicts.length > 0) {
+   return toMCPResponse({
+-    error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', '),
++    error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', ') +
++      '. Remove active tasks first or use task_duplicate on the conflicting tasks before retrying restore.',
+   });
+ }
+ 
++const depthCache = new Map<string, number>();
++
++function computeRestoreDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
++  const cached = depthCache.get(id);
++  if (cached !== undefined) return cached;
++  if (visited.has(id) || !parentId) {
++    depthCache.set(id, 0);
++    return 0;
++  }
++  visited.add(id);
++  const parent = subtreeRows.find(t => t.id === parentId);
++  if (!parent) {
++    depthCache.set(id, 0);
++    return 0;
++  }
++  const d = 1 + computeRestoreDepth(parent.id, parent.parent_id, visited);
++  depthCache.set(id, d);
++  return d;
++}
++
++for (const t of subtreeRows) {
++  computeRestoreDepth(t.id, t.parent_id);
++}
++
++const sortedRows = [...subtreeRows].sort((a, b) => (depthCache.get(a.id) ?? 0) - (depthCache.get(b.id) ?? 0));
++
+ const subtreeSet = new Set(subtreeIds);
+ 
+ const restoreAll = db.transaction(() => {
+-  const getTask = db.prepare('SELECT * FROM archived_tasks WHERE id = ?');
+   const checkParentExists = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
+ 
+   const insertStmt = db.prepare(
+     `INSERT INTO tasks (id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+   );
+ 
+   const deleteArchived = db.prepare('DELETE FROM archived_tasks WHERE id = ?');
++  const getArchivedDepends = db.prepare('SELECT id, depends_on FROM archived_tasks WHERE depends_on != ?');
++  const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
+ 
+-  for (const id of subtreeIds) {
+-    const row = getTask.get(id) as TaskRow | undefined;
+-    if (!row) continue;
+-
++  for (const row of sortedRows) {
+     let resolvedParentId = row.parent_id;
+     if (resolvedParentId && !subtreeSet.has(resolvedParentId)) {
+       const parentInTasks = (checkParentExists.get(resolvedParentId) as { cnt: number }).cnt > 0;
+       if (!parentInTasks) {
+@@ -222,10 +249,20 @@
+       row.status, row.tool_name, row.result, row.error, row.review_comment,
+       row.priority, row.retry_count, row.max_retries, row.depends_on,
+       row.created_at, row.updated_at,
+     );
+-    deleteArchived.run(id);
++    deleteArchived.run(row.id);
+   }
++
++  const restoredSet = new Set(subtreeIds);
++  const remainingArchived = getArchivedDepends.all('[]') as { id: string; depends_on: string }[];
++  for (const ra of remainingArchived) {
++    const deps: string[] = JSON.parse(ra.depends_on);
++    const cleaned = deps.filter(d => !restoredSet.has(d));
++    if (cleaned.length !== deps.length) {
++      updateArchivedDepends.run(JSON.stringify(cleaned), ra.id);
++    }
++  }
+ });
+ 
+ restoreAll();
+ 
+
+[0m
+Now let me restructure the restore handler to address ordering, depends_on cleanup, and error message:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix: Add child status validation in cascade archive mode
+[✓] Fix: Clean up orphan depends_on references after archive
+[✓] Fix: Add archived_at to archive response
+[✓] Fix: Add cascade to restore response
+[✓] Fix: Inefficient conflict check - use IN query in restore
+[✓] Fix: Add cycle guard to computeDepth
+[✓] Build: Run npm run build and verify
+[✓] Review: Call explore agent to review fixes
+[✓] ITERATE Fix 1: Add depends_on cleanup on restore (symmetrical to archive)
+[✓] ITERATE Fix 2: Replace non-null assertion with ?? 0 in sort
+[✓] ITERATE Fix 3: Order restore subtree by depth to avoid parent-resolution issues
+[✓] ITERATE Fix 4: Improve restore conflict error message
+[•] Build and re-review
+[ ] Output final SCORE and REVIEW_COMPLETE
+[0m
+Build passes. Now final review:
+[0m• [0mFinal review archive fixes[90m General Agent[0m
+[0m✓ [0mFinal review archive fixes[90m General Agent[0m
+[0m→ [0mRead src/archiver.ts[90m [offset=230][0m
+One more medium issue to fix. Let me add `depends_on` cleanup for restored tasks:
+[0m
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -231,8 +231,9 @@
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+ );
+ 
+ const deleteArchived = db.prepare('DELETE FROM archived_tasks WHERE id = ?');
++const depExistsInTasks = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
+ const getArchivedDepends = db.prepare('SELECT id, depends_on FROM archived_tasks WHERE depends_on != ?');
+ const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
+ 
+ for (const row of sortedRows) {
+@@ -243,12 +244,24 @@
+       resolvedParentId = null;
+     }
+   }
+ 
++  let resolvedDependsOn = row.depends_on;
++  if (row.depends_on !== '[]') {
++    const deps: string[] = JSON.parse(row.depends_on);
++    const validDeps = deps.filter(d => {
++      if (subtreeSet.has(d)) return true;
++      return (depExistsInTasks.get(d) as { cnt: number }).cnt > 0;
++    });
++    if (validDeps.length !== deps.length) {
++      resolvedDependsOn = JSON.stringify(validDeps);
++    }
++  }
++
+   insertStmt.run(
+     row.id, resolvedParentId, row.title, row.description, row.goal,
+     row.status, row.tool_name, row.result, row.error, row.review_comment,
+-    row.priority, row.retry_count, row.max_retries, row.depends_on,
++    row.priority, row.retry_count, row.max_retries, resolvedDependsOn,
+     row.created_at, row.updated_at,
+   );
+   deleteArchived.run(row.id);
+ }
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/archiver.ts
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix: Add child status validation in cascade archive mode
+[✓] Fix: Clean up orphan depends_on references after archive
+[✓] Fix: Add archived_at to archive response
+[✓] Fix: Add cascade to restore response
+[✓] Fix: Inefficient conflict check - use IN query in restore
+[✓] Fix: Add cycle guard to computeDepth
+[✓] Build: Run npm run build and verify
+[✓] Review: Call explore agent to review fixes
+[✓] ITERATE Fix 1: Add depends_on cleanup on restore (symmetrical to archive)
+[✓] ITERATE Fix 2: Replace non-null assertion with ?? 0 in sort
+[✓] ITERATE Fix 3: Order restore subtree by depth to avoid parent-resolution issues
+[✓] ITERATE Fix 4: Improve restore conflict error message
+[✓] ITERATE Fix 5: Clean depends_on on restored tasks (dangling archived refs)
+[✓] Build and re-review
+[✓] Output final SCORE and REVIEW_COMPLETE
+[0m
+All fixes applied across 3 rounds. Build passes with zero errors.
+
+**SCORE: 95/100**
+
+**REVIEW_COMPLETE**
+
+Summary of all fixes applied to `src/archiver.ts`:
+
+| # | Fix | Severity |
+|---|-----|----------|
+| 1 | Child status validation in cascade archive — all subtree tasks must be `completed`/`approved` | Critical |
+| 2 | `depends_on` cleanup on archive — active tasks stripped of archived IDs | High |
+| 3 | `depends_on` cleanup on restore (archived tasks) — symmetrical to archive | High |
+| 4 | `depends_on` cleanup on restore (restored tasks) — prevents dangling refs | Medium |
+| 5 | `archived_at` timestamp in archive response | Medium |
+| 6 | `cascade` flag in restore response | Medium |
+| 7 | Efficient `IN (...)` query for restore conflict check | Medium |
+| 8 | Cycle guard (`visited` set) in `computeDepth` | Medium |
+| 9 | `?? 0` fallback in sort comparators (replaced `!` non-null assertion) | Medium |
+| 10 | Depth-ordered restore (ascending = parents first) | Medium |
+| 11 | Actionable error message on restore ID conflict | Low |

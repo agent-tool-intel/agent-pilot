@@ -1,0 +1,123 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead test/test-all.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead package.json
+[0m→ [0mRead src/state-machine.ts[90m [limit=60][0m
+[0m→ [0mRead src/snapshot.ts[90m [limit=50][0m
+[0m→ [0mRead src/integrity.ts[90m [limit=50][0m
+[0m→ [0mRead src/system-info.ts[90m [limit=50][0m
+[0m→ [0mRead src/archiver.ts[90m [limit=60][0m
+[0m→ [0mRead src/metrics.ts[90m [limit=60][0m
+Let me read a few more key source files to understand the exact parameter schemas.
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/state-machine.ts[90m [offset=61][0m
+[0m→ [0mRead src/planner.ts
+[0m→ [0mRead src/reflector.ts
+[0m→ [0mRead src/rollback.ts
+[0m→ [0mRead src/integrity.ts[90m [offset=51][0m
+[0m→ [0mRead src/system-info.ts[90m [offset=51][0m
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/dependency-graph.ts
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/importer.ts
+[0m→ [0mRead src/audit-log.ts
+[0m→ [0mRead src/archiver.ts[90m [offset=61][0m
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/tool-export.ts
+[0m→ [0mRead src/tool-import.ts
+Now I have a thorough understanding of all source files. Here is the implementation plan.
+
+## Implementation Plan: Comprehensive E2E Test Script
+
+### Current State
+An existing test at `/home/administrator/task-orchestrator/test/test-all.ts` (538 lines) covers all 30 tools across 5 phases with a custom inline test framework. It imports handlers from `../dist/` (compiled JS). The `npm test` command already exists in `package.json` running `npx tsx test/test-all.ts`.
+
+### Scope
+The existing test already satisfies the core requirements — full workflow, model_config CRUD, PASS/FAIL output for all tools. The plan below rewrites it with improvements for robustness, maintainability, and edge-case coverage.
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `test/test-all.ts` | **Rewrite** — keep custom test framework, restructure phases, add edge-case error tests, switch imports to `../src/` for direct tsx execution without build step |
+| `package.json` | **No change** — `npm test` already runs `npx tsx test/test-all.ts` |
+
+### Test Architecture
+
+**Import approach**: Use `../src/` paths with `.js` extension (tsx resolves to `.ts`). This removes the `npm run build` dependency.
+
+```
+import { handleTaskPlan } from '../src/planner.js';
+```
+
+**Test framework**: Keep the existing inline `test()`, `parseContent()`, `assertSuccess()`, `assert()` helpers — they work well.
+
+### Phase Breakdown (33+ tests)
+
+**Phase 1 — Main Workflow (16 tests)**
+
+1. `task_plan` — Create a plan with 2 subtasks of different priorities; verify `root_task.id`, status=`pending`, subtask count
+2. `model_classify` — Classify a code-related description; verify `category`, `confidence`>0, `matched_keywords` array, 8 `all_scores` entries
+3. `model_route` — Route same description with `plan_preset='B'`; verify `model` string, `category` matches classify output, `plan_used` includes "B"
+4. `task_next (executor)` — Get next pending task; verify `next_task` not null, status=`pending`, matches first subtask
+5. `task_update (in_progress)` — Transition subtask → `in_progress`; verify `task.status`, `task.id`
+6. `task_update (pending_review)` — Transition to `pending_review` with result text; verify status + result stored
+7. `task_snapshot` — Snapshot with label; verify `snapshot_id`, `task_count`≥1, `created_at`
+8. `task_next (reviewer)` — Find `pending_review` task; verify `next_task.status`, title matches
+9. `task_update (approved)` — Approve with review comment; verify `task.status='approved'`, `parent_auto_completed=true`, `parent_status='completed'`
+10. `task_reflect` — Reflect on root; verify `task_tree` array, `summary.total`≥1, `summary.completed`≥1, `suggestions` array, `summary.success_rate`=1
+11. `data_integrity_check` — Scan with `repair=false`; verify `healthy` boolean, `issues` array, `issues_found`≥0
+12. `system_info` — Get DB info; verify `server.name`, `server.version`, `total_tasks`>0, `database_file_size_bytes`, `table_row_counts`
+13. `data_integrity_check (repair)` — Run repair; verify `healthy` boolean, `repair_applied` conditional on `issues_found`>0
+14. `task_archive` — Archive completed tree; verify `archived`=rootTaskId, `subtrees_archived`≥1, `cascade=true`
+15. `task_archive_list` — List archived; verify `total`>0, `tasks` array non-empty
+16. `task_archive_restore` — Restore archived; verify `restored`=rootTaskId, `subtrees_restored`≥1, `cascade=true`
+
+**Phase 2 — Model Config (4 tests)**
+
+17. `model_config (list)` — List config; verify `active_plan`, `categories` array with ≥1 entry, `available_plans` has 3
+18. `model_config (switch)` — Switch to plan A; verify `active_plan='A'`, `plan_name`, `message`
+19. `model_config (set)` — Override `code_generation` mapping; verify `updated.category`, `updated.primary`, `updated.fallback`
+20. `model_config (reset)` — Reset plan A to defaults; verify `plan='A'`, `plan_name`, `message`
+
+**Phase 3 — Tool Registry (5 tests)**
+
+21. `tool_register` — Register a test tool; verify `name`, `provider`, `tags` array
+22. `tool_search` — Search by query; verify `results` non-empty, first result name matches, `relevance_score`
+23. `tool_update` — Update description + tags; verify `description` changed, `tags` includes new tag
+24. `tool_deprecate` — Deprecate with replacement; verify `name`, `[DEPRECATED]` prefix in description, `replacement`
+25. `tool_stats` — Get stats; verify `total`>0, `deprecated`≥1, `per_provider`, `top_tags`, `recently_added`
+
+**Phase 4 — Tool Export/Import (2 tests)**
+
+26. `tool_export` — Export to `/tmp/e2e_tool_export.json`; verify `tool_count`>0, `exported_to` matches, file exists on disk
+27. `tool_import` — Import in merge mode; verify `imported`>0, `skipped`≥0, `errors` array
+
+**Phase 5 — Task Utilities (10 tests)**
+
+28. `task_status` — View tree format; verify `root` with title/status, `tasks` array
+29. `task_export` — Export to JSON; verify `task_count`≥1, file exists on disk
+30. `task_import` — Import exported tree; verify `root_id` string, `imported_count`≥1
+31. `task_duplicate` — Duplicate imported tree; verify `original_id`, `new_root_id` differs, `duplicated_count`≥1
+32. `task_batch_update` — Create 3-task plan, update 2 to `in_progress`; verify `succeeded=2`, `failed=0`
+33. `task_dependency_graph` — ASCII + JSON formats; verify `graph` string for ASCII, `format` matches
+34. `task_audit_log` — Query audit for batch-updated task; verify `entries` array non-empty
+35. `task_cancel` — Create plan, cancel a pending subtask; verify `cancelled.id`, `cancelled.previous_status='pending'`, `reason`
+36. `task_metrics` — Get metrics; verify `total_roots`>0, `status_breakdown`, `avg_retries`, `tree_summary`
+37. `task_rollback` — Create plan, update to `in_progress`, rollback; verify `rolled_back_from='in_progress'`, `rolled_back_to='pending'`
+
+### Edge-Case Error Tests (Phase 6 — 3 tests)
+
+38. `task_plan (missing goal)` — Call with empty goal; expect error response
+39. `task_next (unknown task_id)` — Call with non-existent UUID; expect graceful error
+40. `task_cancel (completed task)` — Try to cancel an approved task; expect error
+
+PLAN_READY

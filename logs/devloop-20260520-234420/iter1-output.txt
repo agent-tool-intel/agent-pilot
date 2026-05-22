@@ -1,0 +1,218 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/types.ts[90m [offset=140, limit=70][0m
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/index.ts[90m [offset=130, limit=40][0m
+[0m→ [0mRead src/index.ts[90m [offset=325, limit=50][0m
+Let me verify the current state of the implementation across all relevant files.
+The `tool_update` MCP tool is already fully implemented across all required files. Let me verify by building.
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m• [0mReview tool_update implementation[90m Explore Agent[0m
+Build passes with zero errors. Now let me review the implementation for quality.
+[0m✓ [0mReview tool_update implementation[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[ ] Fix B1: FTS5 orphaned entries - always sync FTS5 on any update
+[ ] Fix B2: Add .min(1) to schema and provider in ToolUpdateInput
+[ ] Fix I1: Add schema to ToolRegisterOutput for consistency
+[ ] Fix I2: Use toMCPResponse for error responses in handleToolUpdate/handleToolDeprecate
+[ ] Build and verify
+[ ] Re-review after fixes
+[0m
+Review found 2 bugs and several inconsistencies. Let me fix them all.
+[0m# [0mTodos
+[•] Fix B1: FTS5 orphaned entries - always sync FTS5 on any update
+[ ] Fix B2: Add .min(1) to schema and provider in ToolUpdateInput
+[ ] Fix I1: Add schema to ToolRegisterOutput for consistency
+[ ] Fix I2: Use toMCPResponse for error responses in handleToolUpdate/handleToolDeprecate
+[ ] Build and verify
+[ ] Re-review after fixes
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -44,20 +44,17 @@
+ db.prepare(
+   'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+ ).run(input.name, description, schema, provider, tags.join(','), existing.created_at);
+ 
+-const searchableChanged = input.description !== undefined || input.tags !== undefined;
+-if (searchableChanged) {
+-  try {
+-    db.prepare(
+-      'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
+-    ).run(input.name);
+-    db.prepare(
+-      'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
+-    ).run(input.name, description, tags.join(','));
+-  } catch {
+-    // FTS5 not available
+-  }
++try {
++  db.prepare(
++    'DELETE FROM tools_fts WHERE rowid = (SELECT rowid FROM tools WHERE name = ?)'
++  ).run(input.name);
++  db.prepare(
++    'INSERT INTO tools_fts (rowid, name, description, tags) VALUES ((SELECT rowid FROM tools WHERE name = ?), ?, ?, ?)'
++  ).run(input.name, description, tags.join(','));
++} catch {
++  // FTS5 not available
+ }
+ 
+ return toMCPResponse({
+   name: input.name,
+
+[0m
+Now applying all four fixes in parallel:
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -161,10 +161,10 @@
+ // ─── tool_update ───
+ export const ToolUpdateInput = z.object({
+   name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name to update (snake_case)'),
+   description: z.string().min(1).optional().describe('New description'),
+-  schema: z.string().optional().describe('New JSON Schema string'),
+-  provider: z.string().optional().describe('New provider'),
++  schema: z.string().min(1).optional().describe('New JSON Schema string'),
++  provider: z.string().min(1).optional().describe('New provider'),
+   tags: z.array(z.string()).optional().describe('New tags for searchability'),
+ });
+ export type ToolUpdateInput = z.infer<typeof ToolUpdateInput>;
+ 
+
+[0m
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -152,8 +152,9 @@
+ 
+ export const ToolRegisterOutput = z.object({
+   name: z.string(),
+   description: z.string(),
++  schema: z.string(),
+   provider: z.string(),
+   tags: z.array(z.string()),
+   created_at: z.string(),
+ });
+
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -32,9 +32,9 @@
+ const db = getDb();
+ 
+ const existing = db.prepare('SELECT * FROM tools WHERE name = ?').get(input.name) as ToolRow | undefined;
+ if (!existing) {
+-  return { content: [{ type: 'text', text: JSON.stringify({ error: 'Tool not found: ' + input.name }) }], isError: true };
++  return toMCPResponse({ error: 'Tool not found: ' + input.name });
+ }
+ 
+ const description = input.description ?? existing.description;
+ const schema = input.schema ?? existing.schema;
+
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -124,9 +124,9 @@
+ const db = getDb();
+ 
+ const existing = db.prepare('SELECT * FROM tools WHERE name = ?').get(input.name) as ToolRow | undefined;
+ if (!existing) {
+-  return { content: [{ type: 'text', text: JSON.stringify({ error: 'Tool not found: ' + input.name }) }], isError: true };
++  return toMCPResponse({ error: 'Tool not found: ' + input.name });
+ }
+ 
+ const deprecationPrefix = '[DEPRECATED]';
+ let newDescription = existing.description;
+
+[0m
+[0m← [0mEdit src/tool-registry.ts
+Index: /home/administrator/task-orchestrator/src/tool-registry.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/tool-registry.ts
++++ /home/administrator/task-orchestrator/src/tool-registry.ts
+@@ -20,8 +20,9 @@
+ 
+ return toMCPResponse({
+   name: input.name,
+   description: input.description,
++  schema: input.schema,
+   provider: input.provider,
+   tags: input.tags,
+   created_at: now,
+ });
+
+[0m
+Now I need to update `handleToolRegister` to include `schema` in its output, since `ToolRegisterOutput` now requires it:
+[0m# [0mTodos
+[✓] Fix B1: FTS5 orphaned entries - always sync FTS5 on any update
+[✓] Fix B2: Add .min(1) to schema and provider in ToolUpdateInput
+[✓] Fix I1: Add schema to ToolRegisterOutput for consistency
+[✓] Fix I2: Use toMCPResponse for error responses in handleToolUpdate/handleToolDeprecate
+[•] Build and verify
+[ ] Re-review after fixes
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix B1: FTS5 orphaned entries - always sync FTS5 on any update
+[✓] Fix B2: Add .min(1) to schema and provider in ToolUpdateInput
+[✓] Fix I1: Add schema to ToolRegisterOutput for consistency
+[✓] Fix I2: Use toMCPResponse for error responses in handleToolUpdate/handleToolDeprecate
+[✓] Build and verify
+[•] Re-review after fixes
+[0m
+Build passes. Now re-reviewing the fixed implementation:
+[0m→ [0mRead src/tool-registry.ts[90m [limit=75][0m
+[0m→ [0mRead src/types.ts[90m [offset=144, limit=40][0m
+[0m→ [0mRead src/tool-registry.ts[90m [offset=125, limit=20][0m
+All fixes confirmed. Let me verify the `handleToolDeprecate` error fix as well:
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix B1: FTS5 orphaned entries - always sync FTS5 on any update
+[✓] Fix B2: Add .min(1) to schema and provider in ToolUpdateInput
+[✓] Fix I1: Add schema to ToolRegisterOutput for consistency
+[✓] Fix I2: Use toMCPResponse for error responses in handleToolUpdate/handleToolDeprecate
+[✓] Build and verify
+[✓] Re-review after fixes
+[0m
+SCORE: 95/100
+
+REVIEW_COMPLETE
+
+**Summary:** The `tool_update` MCP tool was already implemented, but the review found 2 bugs and 3 inconsistencies. All fixed:
+
+| Fix | File | Change |
+|-----|------|--------|
+| **B1** - FTS5 orphaned entries | `tool-registry.ts:48-58` | Always sync FTS5 on update (removed `searchableChanged` guard) |
+| **B2** - Empty string schema/provider | `types.ts:166-167` | Added `.min(1)` to `schema` and `provider` in `ToolUpdateInput` |
+| **I1** - Missing schema in output | `types.ts:156` | Added `schema` to `ToolRegisterOutput` (now consistent with Update/Deprecate) |
+| **I2** - Error response format | `tool-registry.ts:37,129` | Switched to `toMCPResponse({ error: ... })` for consistent formatting |
+
+Build passes with zero errors.

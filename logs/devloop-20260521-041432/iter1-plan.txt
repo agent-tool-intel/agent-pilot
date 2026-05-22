@@ -1,0 +1,138 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m→ [0mRead src
+[0m
+[0m$ [0mcat /mnt/f/auto-model-router/task-rules.json
+cat: /mnt/f/auto-model-router/task-rules.json: No such file or directory
+[0m
+[0m✱ [0mGlob "**/task-rules.json"[90m 0 matches[0m
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/config
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/config/plan-b.json
+Now I have a complete picture. Here is the implementation plan:
+
+---
+
+## Plan
+
+### Current state
+`src/model-router.ts` **already exists** with:
+- `classify()` engine (keyword + pattern + output-type matching, weighted scoring, FALLBACK_MAP for low confidence)
+- `handleModelClassify()` handler wired in `index.ts` `CallToolRequestSchema`
+- `ModelClassifyInput` Zod schema
+
+### What's broken / missing
+
+1. **`model_classify` is unlisted** — The `ListToolsRequestSchema` handler's `tools` array omits `model_classify`, `model_route`, and `model_config`. MCP clients can't discover the tool.
+
+2. **Fallback logic mismatch** — When confidence < 0.2 the FALLBACK_MAP runs, but if that also misses, `best` (possibly 0-score) is returned. The spec requires: **if no match, fallback to `high_logic`**. Currently there's no guarantee of that — a 0-score `best` passes through.
+
+3. **Return shape edge case** — `all_scores` is a computed array of all categories, but if the fallback via `FALLBACK_MAP` triggers, it returns a manual object where `all_scores` still references the computed `scores` — that's actually fine, but the `confidence` could be inconsistent with the fallback path.
+
+### Files to modify
+
+#### File 1: `src/index.ts`
+
+Add `model_classify` tool definition to the `ListToolsRequestSchema` handler, inserted after the last existing tool definition (before closing bracket of tools array). Also add `model_route` and `model_config` since they are also missing from discovery.
+
+**Insert block** at `src/index.ts:382` (before `]` closing the tools array):
+
+```ts
+{
+  name: 'model_classify',
+  description: 'Classify a task description into one of 8 categories using keyword-based rule engine (zero LLM). Returns category, confidence, matched keywords, and all category scores.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_description: { type: 'string', description: 'Task description to classify' },
+    },
+    required: ['task_description'],
+  },
+},
+{
+  name: 'model_route',
+  description: 'Route a task to the best model based on its classification and available models for the active plan.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      task_description: { type: 'string', description: 'Task description to route' },
+      available_models: { type: 'array', items: { type: 'string' }, description: 'Available model IDs (optional)' },
+      plan_preset: { type: 'string', enum: ['A', 'B', 'C'], description: 'Plan preset (default B)' },
+    },
+    required: ['task_description'],
+  },
+},
+{
+  name: 'model_config',
+  description: 'Manage model routing configuration: list, switch plan, set overrides, or reset to defaults.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['list', 'switch', 'set', 'reset'], description: 'Action to perform' },
+      plan: { type: 'string', enum: ['A', 'B', 'C'], description: 'Plan preset' },
+      category: { type: 'string', description: 'Category name (for set)' },
+      primary_model: { type: 'string', description: 'Primary model ID (for set)' },
+      fallback_model: { type: 'string', description: 'Fallback model ID (for set)' },
+    },
+    required: ['action'],
+  },
+},
+```
+
+#### File 2: `src/model-router.ts`
+
+Fix the fallback to guarantee `high_logic` when no meaningful match is found.
+
+**Replace lines 186–206** (the fallback block) to add an explicit `high_logic` fallback after the FALLBACK_MAP check:
+
+```ts
+// Try fallback mapping if confidence is very low
+if (confidence < 0.2) {
+  for (const [key, cat] of Object.entries(FALLBACK_MAP)) {
+    if (text.includes(key.toLowerCase())) {
+      const rule = CATEGORY_RULES[cat];
+      return {
+        category: cat, category_name: rule.name, confidence: 0.5,
+        matched_keywords: [key],
+        all_scores: scores,
+      };
+    }
+  }
+
+  // Ultimate fallback to high_logic
+  const defaultRule = CATEGORY_RULES['high_logic'];
+  return {
+    category: 'high_logic',
+    category_name: defaultRule.name,
+    confidence: 0.3,
+    matched_keywords: [],
+    all_scores: scores.map(s => ({ ...s, score: Math.round(s.score * 100) / 100 })),
+  };
+}
+```
+
+### Edge cases covered
+
+| Edge case | Handling |
+|---|---|
+| Empty task description | Rejected by Zod `min(1)` |
+| All scores zero | Falls through FALLBACK_MAP → returns `high_logic` with 0.3 confidence |
+| Partial match on one category | Correctly returns highest-scoring category |
+| Confidence ceiling | Clamped via `Math.min(1.0, maxScore / 8)` |
+| GLM-specific keywords | Used in `glm_keywords` field (could be leveraged; currently stored but not scored — kept for future use, no change needed) |
+| FALLBACK_MAP key partially overlaps a keyword | FALLBACK_MAP only triggers if confidence < 0.2, so normal keyword match takes priority |
+
+### Verification
+
+After edits, run:
+```bash
+npx tsc --noEmit    # type check
+node -e "import('./src/model-router.js').then(m => console.log(m.handleModelClassify({task_description:'測試分類'})))"
+```
+
+---
+
+PLAN_READY

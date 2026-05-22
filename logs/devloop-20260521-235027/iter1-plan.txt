@@ -1,0 +1,133 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m→ [0mRead .
+[0m→ [0mRead src
+[0m→ [0mRead package.json
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/model-router.ts
+[0m→ [0mRead src/state-machine.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/config
+[0m→ [0mRead ROADMAP.md
+[0m→ [0mRead src/config/plan-a.json
+[0m→ [0mRead src/config/plan-b.json
+[0m→ [0mRead src/config/plan-c.json
+[0m→ [0mRead src/planner.ts
+[0m→ [0mRead src/reflector.ts
+[0m→ [0mRead src/tool-registry.ts
+[0m→ [0mRead src/canceller.ts
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/importer.ts
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead src/batch-updater.ts
+[0m→ [0mRead src/dependency-graph.ts
+[0m→ [0mRead src/metrics.ts
+[0m→ [0mRead src/rollback.ts
+[0m→ [0mRead src/snapshot.ts
+[0m→ [0mRead src/audit-log.ts
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/tool-export.ts
+[0m→ [0mRead src/tool-import.ts
+[0m→ [0mRead src/integrity.ts
+[0m→ [0mRead src/system-info.ts
+[0m→ [0mRead tsconfig.json
+[0m→ [0mRead build-all.sh
+[0m→ [0mRead test
+[0m→ [0mRead test/test-all.ts
+I have a complete understanding of the codebase. Here is the implementation plan:
+
+---
+
+## Implementation Plan: README.md
+
+**File to create:** `/home/administrator/task-orchestrator/README.md`
+
+### Sections to include:
+
+**1. Project Overview (header + 2 paragraphs)**
+- Name: Task Orchestrator MCP Server
+- Tagline: "Infrastructure Moat First — the stateful task engine + AI-native tool registry + Model Router for MCP"
+- Design philosophy: All features are infrastructure-heavy, model-independent, no embedded LLM. Model-layer features get absorbed in 6mo; infrastructure (SQLite, state machine, FTS5, rule engine) is structurally defensible.
+- Model Router: Zero-LLM keyword-based classification → Plan A/B/C routing → cost-optimized model selection
+
+**2. Quick Start (4 steps)**
+```bash
+git clone <repo> && cd task-orchestrator
+npm install
+npm run build
+# Configure in Claude Code or OpenCode (JSON snippet for MCP server)
+```
+
+**3. Full API Reference**
+Group into 7 phases, listing all 30 tools with:
+- Name, description, input/output shapes (abbreviated)
+- Phase 1: Core Engine (task_plan, task_next, task_update, task_reflect, task_status)
+- Phase 2: Task Lifecycle (task_cancel, task_export, task_import, task_duplicate, task_batch_update, task_dependency_graph)
+- Phase 3: Tool Registry (tool_register, tool_search, tool_update, tool_deprecate, tool_export, tool_import, tool_stats)
+- Phase 4: Quality & Accountability (task_audit_log, task_metrics, task_rollback, task_snapshot)
+- Phase 5: Data Lifecycle (task_archive, task_archive_list, task_archive_restore)
+- Phase 5.5: Model Router (model_classify, model_route, model_config)
+- Phase 7: System (system_info, data_integrity_check)
+
+**4. State Machine Diagram**
+Mermaid state diagram:
+```
+stateDiagram-v2
+  [*] --> pending
+  pending --> in_progress
+  pending --> cancelled
+  pending --> completed
+  in_progress --> pending_review
+  in_progress --> completed
+  in_progress --> failed
+  in_progress --> blocked
+  in_progress --> cancelled
+  pending_review --> approved
+  pending_review --> needs_revision
+  approved --> completed
+  needs_revision --> pending
+  failed --> pending
+  failed --> cancelled
+  blocked --> pending
+  blocked --> cancelled
+  blocked --> completed
+  completed --> [*]
+  cancelled --> [*]
+```
+
+**5. Dual-Review Workflow**
+Agent A (executor): task_next(mode=executor) → execute → task_update(status=pending_review)
+Agent B (reviewer): task_next(mode=reviewer) → review
+  → task_update(status=approved) OR task_update(status=needs_revision, review_comment=...)
+Auto-cascade: when all subtasks approved/completed, parent auto-completes.
+
+**6. Model Router**
+- What it is: Zero-LLM keyword-based rule engine → 8 categories
+- Plan A (International): Claude Opus 4.7, Sonnet 4.6, GPT-5.4, Gemini, DALL-E 4
+- Plan B (China): DeepSeek V4-Pro, V4-Flash, GLM-5.1, GLM-4.6V, CogView4, Kimi K2.5
+- Plan C (GLM Lazy): All GLM series — GLM-5.1, GLM-5, GLM-4-Flash, GLM-4.6V
+- How to switch: `model_config action=switch plan=B`
+- Cost savings: Plan A uses expensive flagship for reasoning only, cheap for reading (Gemini $0.40 → Claude $15 = 97% savings). Plan B costs 1-2 orders of magnitude less than Plan A (DeepSeek ¥2 vs OpenAI $15). Dynamic routing reduces blended cost by ~60% vs always-strongest.
+
+**7. Architecture — The Infrastructure Moat**
+- SQLite: persistent task state survives model restarts, full audit trail with triggers, WAL mode for concurrent access, recursive CTE for tree operations
+- State machine: enforced valid transitions, parent auto-cascade, dual-review states
+- FTS5: full-text search over tool registry, relevance scoring — model upgrades cannot create this
+- Rule engine (model_classify): 8-category keyword classifier with zero LLM dependency — models cannot replace deterministic matching for routing
+
+**8. Register in Claude Code / OpenCode**
+Two JSON config snippets for MCP server registration.
+
+### Edge cases covered:
+- Mention what happens with no DB / first run (auto-initializes schema and seeds Plan B)
+- Error handling pattern (all tools return `{error: string}` on failure)
+- State machine validates transitions and rejects invalid ones with clear error
+- Dependencies: blocked tasks auto-resolved when deps completed
+- Archive: only completed/approved tasks archivable; cascade cleans children
+- Rollback: blocked on terminal states; requires prior audit entry
+
+---
+
+PLAN_READY

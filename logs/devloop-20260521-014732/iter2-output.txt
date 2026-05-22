@@ -1,0 +1,156 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m# [0mTodos
+[•] Read current src/system-info.ts and src/db.ts to understand the codebase
+[ ] Fix DB_PATH duplication: import DB_PATH from db.js instead of local definition
+[ ] Fix WAL column names: use correct SQLite pragma column names
+[ ] Build and verify (npm run build)
+[ ] Review fixes with explore agent
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+[0m→ [0mRead src/system-info.ts
+[0m→ [0mRead src/db.ts
+[0m
+[0m# [0mTodos
+[✓] Read current src/system-info.ts and src/db.ts to understand the codebase
+[✓] Fix DB_PATH duplication: import DB_PATH from db.js instead of local definition
+[✓] Fix WAL column names: use correct SQLite pragma column names
+[•] Build and verify (npm run build)
+[ ] Review fixes with explore agent
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+The file already has the fixes applied. Let me build and verify, then review.
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Read current src/system-info.ts and src/db.ts to understand the codebase
+[✓] Fix DB_PATH duplication: import DB_PATH from db.js instead of local definition
+[✓] Fix WAL column names: use correct SQLite pragma column names
+[✓] Build and verify (npm run build)
+[•] Review fixes with explore agent
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Build passes cleanly. Now let me review the full implementation.
+[0m• [0mReview system-info implementation[90m Explore Agent[0m
+[0m✓ [0mReview system-info implementation[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Read current src/system-info.ts and src/db.ts to understand the codebase
+[✓] Fix DB_PATH duplication: import DB_PATH from db.js instead of local definition
+[✓] Fix WAL column names: use correct SQLite pragma column names
+[✓] Build and verify (npm run build)
+[✓] Review fixes with explore agent
+[•] Fix Issue #1: Add error logging in WAL checkpoint catch block
+[ ] Fix Issue #2: Use more specific type for pragma return
+[ ] Fix Issue #3: Exclude FTS5 shadow tables from table_row_counts
+[ ] Rebuild and re-review
+[ ] Output SCORE and REVIEW_COMPLETE
+[0m
+Good review. Let me fix the minor issues found.
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -31,14 +31,15 @@
+ const shmExists = existsSync(DB_PATH + '-shm');
+ 
+ let walCheckpointPages: number | null = null;
+ try {
+-  const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as unknown as Record<string, unknown>[];
++  const checkpointRows = db.pragma('wal_checkpoint(PASSIVE)') as { busy: number; log: number; checkpointed: number }[];
+   if (checkpointRows && checkpointRows.length > 0) {
+     const row = checkpointRows[0];
+-    walCheckpointPages = Number(row['checkpointed'] ?? row['log'] ?? row['busy'] ?? 0);
++    walCheckpointPages = Number(row.checkpointed ?? row.log ?? row.busy ?? 0);
+   }
+-} catch {
++} catch (err) {
++  console.error('WAL checkpoint query failed:', err);
+   walCheckpointPages = null;
+ }
+ 
+ const tables = db.prepare(
+
+[0m
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -42,9 +42,9 @@
+   walCheckpointPages = null;
+ }
+ 
+ const tables = db.prepare(
+-  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
++  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name"
+ ).all() as { name: string }[];
+ 
+ const tableRowCounts: Record<string, number> = {};
+ for (const table of tables) {
+
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m• [0mRe-review system-info fixes[90m Explore Agent[0m
+Build passes. Let me do a final re-review.
+[0m✓ [0mRe-review system-info fixes[90m Explore Agent[0m
+[0m
+[0m← [0mEdit src/system-info.ts
+Index: /home/administrator/task-orchestrator/src/system-info.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/system-info.ts
++++ /home/administrator/task-orchestrator/src/system-info.ts
+@@ -42,9 +42,9 @@
+   walCheckpointPages = null;
+ }
+ 
+ const tables = db.prepare(
+-  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name"
++  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%\\_fts%' ESCAPE '\\' ORDER BY name"
+ ).all() as { name: string }[];
+ 
+ const tableRowCounts: Record<string, number> = {};
+ for (const table of tables) {
+
+[0m
+Let me fix the `LIKE` wildcard issue for precision.
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/system-info.ts
+[0m
+[0m# [0mTodos
+[✓] Read current src/system-info.ts and src/db.ts to understand the codebase
+[✓] Fix DB_PATH duplication: import DB_PATH from db.js instead of local definition
+[✓] Fix WAL column names: use correct SQLite pragma column names
+[✓] Build and verify (npm run build)
+[✓] Review fixes with explore agent
+[✓] Fix Issue #1: Add error logging in WAL checkpoint catch block
+[✓] Fix Issue #2: Use more specific type for pragma return
+[✓] Fix Issue #3: Exclude FTS5 shadow tables from table_row_counts
+[✓] Rebuild and re-review
+[✓] Output SCORE and REVIEW_COMPLETE
+[0m
+**SCORE: 95/100**
+
+**REVIEW_COMPLETE**
+
+All fixes applied to `src/system-info.ts`:
+
+| Fix | Before | After |
+|-----|--------|-------|
+| DB_PATH duplication | Local `const DB_PATH` with path/url imports (lines 5-7) | Single import from `./db.js` (line 1) |
+| WAL column names | `row['wal_checkpoint_pages']` (nonexistent column) | `row['checkpointed']` (correct pragma column) |
+| Specific pragma type | `as unknown as Record<string, unknown>[]` | `as { busy: number; log: number; checkpointed: number }[]` |
+| Silent error swallowing | `catch { walCheckpointPages = null; }` | `catch (err) { console.error(...); walCheckpointPages = null; }` |
+| FTS5 shadow tables | Exposed in `table_row_counts` | Excluded via `NOT LIKE '%%\_fts%%' ESCAPE '\'` |
+
+Remaining: 2 pre-existing silent `catch` blocks (lines 23, 56) — cosmetic, not in scope. Build passes cleanly.

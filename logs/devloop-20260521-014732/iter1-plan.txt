@@ -1,0 +1,93 @@
+[0m
+> build · deepseek-v4-flash
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead src/tool-registry.ts
+Now let me read the key files I need to modify.
+Now I have a thorough understanding of the codebase. Here's the detailed implementation plan:
+
+---
+
+## Implementation Plan: `system_info` MCP Tool
+
+### Overview
+Add a new read-only MCP tool `system_info` with no input parameters that returns database infrastructure statistics. Follows the existing pattern of no-input tools (`tool_stats`, `task_metrics`).
+
+---
+
+### File 1: NEW — `src/system-info.ts`
+
+**Purpose:** Implement the `handleSystemInfo` handler function.
+
+**Design:**
+
+1. **No input parsing** — uses `_args: unknown` pattern (like `handleToolStats` at `src/tool-registry.ts:219`).
+
+2. **Database stats to collect:**
+   - `total_tasks` — `SELECT COUNT(*) FROM tasks`
+   - `total_tools` — `SELECT COUNT(*) FROM tools`
+   - `total_snapshots` — `SELECT COUNT(*) FROM snapshots`
+   - `database_file_size_bytes` — `fs.statSync()` on the db file path
+   - `journal_mode` — `PRAGMA journal_mode`
+   - `wal_exists` — `fs.existsSync()` for `-wal` file
+   - `shm_exists` — `fs.existsSync()` for `-shm` file
+   - `wal_checkpoint_pages` — `PRAGMA wal_checkpoint` (handle varying column names)
+   - `table_row_counts` — dynamic query of all user tables from `sqlite_master`, then `SELECT COUNT(*)` each
+   - `server` — `{ name: 'task-orchestrator', version: '0.2.0' }`
+
+3. **Edge cases handled:**
+   - `model_config` table may not exist (created lazily in `model-router.ts`) — query uses dynamic table detection from `sqlite_master`, so missing tables are naturally excluded
+   - `tools_fts` is a virtual FTS5 table — dynami detection includes it; count queries work on FTS tables
+   - WAL checkpoint pragma returns different column names across SQLite versions — handle with safe property access
+   - DB file path is derived identically to `db.ts` using `import.meta.url`
+   - Empty database — all counts return 0 gracefully
+   - File system errors — wrapped in try/catch for file size and WAL file checks
+
+4. **Imports:**
+   - `fs` from `fs`
+   - `path` from `path`
+   - `fileURLToPath` from `url`
+   - `getDb` from `./db.js`
+   - `toMCPResponse` from `./types.js`
+
+---
+
+### File 2: MODIFY — `src/index.ts`
+
+**Changes:**
+
+1. **Add import** (after line 24):
+   ```
+   import { handleSystemInfo } from './system-info.js';
+   ```
+
+2. **Add tool definition** to the `tools` array (after the `task_snapshot` entry, before the closing `]`):
+   ```ts
+   {
+     name: 'system_info',
+     description: 'Get database infrastructure statistics: table row counts, database file size, WAL status, and server version. Read-only introspection.',
+     inputSchema: {
+       type: 'object',
+       properties: {},
+     },
+   },
+   ```
+
+3. **Add case to switch statement** (after the `task_snapshot` case, before `default`):
+   ```
+   case 'system_info':  return await handleSystemInfo(args);
+   ```
+
+---
+
+### No other files need changes.
+
+This is self-contained: `types.ts` doesn't need a Zod schema for a no-input tool (consistent with `tool_stats` pattern), and `db.ts` doesn't need changes since `getDb()` is the singleton accessor.
+
+---
+
+PLAN_READY

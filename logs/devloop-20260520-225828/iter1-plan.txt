@@ -8,3 +8,107 @@
 [0m→ [0mRead src/types.ts
 [0m→ [0mRead src/index.ts
 Let me read the key files in detail.
+Now I have a thorough understanding of the codebase. Let me produce the plan.
+
+---
+
+## Implementation Plan: `task_import` MCP Tool
+
+### Current State
+The `task_import` tool already exists with a working implementation. Below is a complete analysis of every file and what it contains, followed by potential edge-case improvements.
+
+---
+
+### 1. `src/types.ts` — Already Complete
+
+**What exists:**
+- `TaskImportInput` Zod schema (line 235–237): validates `filepath` (required string)
+- `TaskImportOutput` Zod schema (line 240–243): defines `{ root_id: string, imported_count: number }`
+
+**No changes needed.** Both schemas match the specification.
+
+---
+
+### 2. `src/importer.ts` — Already Complete (150 lines)
+
+**What exists:**
+- `ImportedTaskNode` interface (lines 6–24): mirrors the JSON tree format from `exporter.ts` (nested with `children: ImportedTaskNode[]`)
+- `FlatImportTask` interface (lines 26–47): flattened representation with `newId`, `oldId`, `original_depends_on`, `depends_on`, `depth`
+- `flattenTree()` function (lines 49–91): recursively walks the tree, generates new UUIDs via `uuidv4()`, populates `idMap` (oldId→newId), normalizes optional fields with `??` defaults
+- `handleTaskImport()` function (lines 93–150):
+  1. Parses args via `TaskImportInput.parse(args)`
+  2. Reads and parses JSON file with `fs.readFileSync` + `JSON.parse` (wrapped in try/catch)
+  3. Validates root has `id` (string, non-empty) and `title` (string, non-empty)
+  4. Calls `flattenTree()` to build flat array + idMap
+  5. Remaps `parent_id` via `idMap.get()` and `depends_on` array via `idMap.get().filter(Boolean)`
+  6. Sorts by depth (ascending) to ensure parents insert before children
+  7. Inserts all tasks in a single SQLite transaction
+  8. Returns `{ root_id, imported_count }`
+
+**JSON format consumed:** Matches `exporter.ts` output exactly — a nested tree starting with a root node containing `children: ExportedTaskNode[]`.
+
+---
+
+### 3. `src/index.ts` — Already Complete
+
+**What exists:**
+- Import: `import { handleTaskImport } from './importer.js'` (line 14)
+- Tool registration in `ListToolsRequestSchema` (lines 228–237): name `task_import`, description, input schema with `filepath` (required string)
+- Route in `CallToolRequestSchema` (line 347): `case 'task_import': return await handleTaskImport(args)`
+
+**No changes needed.**
+
+---
+
+### Edge-Case Analysis & Verified Behavior
+
+| Edge Case | Handled? | How |
+|---|---|---|
+| Invalid/missing file | ✅ | try/catch around read + JSON.parse → returns error |
+| Malformed JSON | ✅ | Same catch block |
+| Missing root `id` | ✅ | Explicit check returns error |
+| Missing root `title` | ✅ | Explicit check returns error |
+| Empty children array | ✅ | `node.children \|\| []` |
+| Optional fields absent | ✅ | `?? null` / `?? default` on every optional field |
+| `depends_on` as non-array | ✅ | `Array.isArray` check → defaults to `[]` |
+| `depends_on` ID outside tree | ✅ | `idMap.get()` returns undefined → filtered out |
+| Circular parent_id | ✅ | JSON.parse would fail on circular refs |
+| Duplicate UUID (v4 collision) | ⚠️ | Extremely unlikely; no explicit collision check |
+| Invalid task status string | ⚠️ | Preserved from file; no Zod enum validation |
+| Priority out of 1–5 range | ⚠️ | Accepted as-is if number, default 3 if missing |
+| Recursion depth overflow | ⚠️ | No depth limit; very deep nesting could stack-overflow |
+| Transaction failure | ✅ | Wrapped in `db.transaction()` for atomicity |
+| Input not an object | ✅ | `typeof root !== 'object'` check |
+
+---
+
+### Proposed Improvements (Optional, Not Blocking)
+
+1. **Validate `status` against `TaskStatus` enum** in `types.ts` — reject invalid status strings rather than silently inserting them.
+2. **Audit log entries** — optionally record each import in the audit_log table for traceability.
+3. **Depth limit** — add a `MAX_IMPORT_DEPTH` constant (e.g., 100) to prevent stack overflow on malicious/corrupt files.
+4. **Collision detection** — check new UUIDs against existing DB IDs before inserting (the `id` PK in SQLite would fail on collision, but a pre-check gives a better error message).
+
+---
+
+### Files to Modify
+
+| File | Change | Lines |
+|---|---|---|
+| `src/importer.ts` | No changes needed (already complete) | — |
+| `src/types.ts` | No changes needed (schemas already exist) | — |
+| `src/index.ts` | No changes needed (already registered) | — |
+
+### Summary
+
+The `task_import` MCP tool is **already fully implemented** across three files (`types.ts`, `importer.ts`, `index.ts`). It meets all stated requirements:
+- Required `filepath` input ✅
+- Reads JSON file from disk ✅
+- Validates structure (id + title required) ✅
+- Generates new UUIDs for all nodes ✅
+- Remaps `parent_id` and `depends_on` via idMap ✅
+- Inserts in depth order inside a transaction ✅
+- Returns `{ root_id, imported_count }` ✅
+- Compatible with `task_export` JSON format ✅
+
+PLAN_READY

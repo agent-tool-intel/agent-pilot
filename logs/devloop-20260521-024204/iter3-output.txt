@@ -1,0 +1,826 @@
+[0m
+> build · deepseek-v4-pro
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/index.ts
+[0m→ [0mRead src/db.ts
+[0m→ [0mRead src/types.ts
+[0m→ [0mRead build-all.sh
+Let me start by running a build to see the current state, then find and fix issues.
+[0m
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/exporter.ts
+[0m→ [0mRead src/importer.ts
+[0m→ [0mRead src/duplicator.ts
+[0m→ [0mRead ROADMAP.md
+Build passes. Let me now examine other handler files for patterns and cross-reference the archiver code for issues.
+[0m
+[0m# [0mTodos
+[ ] Fix 1: Add ArchivedTaskRow type to types.ts
+[ ] Fix 2: Validate status filter in handleTaskArchiveList
+[ ] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[ ] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[ ] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[ ] Build: Run npm run build
+[ ] Review: Call @explore to review fixes
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+[0m# [0mTodos
+[•] Fix 1: Add ArchivedTaskRow type to types.ts
+[ ] Fix 2: Validate status filter in handleTaskArchiveList
+[ ] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[ ] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[ ] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[ ] Build: Run npm run build
+[ ] Review: Call @explore to review fixes
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+Now let me implement the fixes. Starting with the `ArchivedTaskRow` type in types.ts:
+[0m← [0mEdit src/types.ts
+Index: /home/administrator/task-orchestrator/src/types.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/types.ts
++++ /home/administrator/task-orchestrator/src/types.ts
+@@ -402,8 +402,12 @@
+   created_at: string;
+   updated_at: string;
+ }
+ 
++export interface ArchivedTaskRow extends TaskRow {
++  archived_at: string;
++}
++
+ export interface ToolRow {
+   name: string;
+   description: string;
+   schema: string;
+
+[0m
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -1,7 +1,7 @@
+ import { z } from 'zod';
+ import { getDb } from './db.js';
+-import { toMCPResponse, type TaskRow } from './types.js';
++import { toMCPResponse, type TaskRow, type ArchivedTaskRow, TaskStatus } from './types.js';
+ 
+ const TaskArchiveInput = z.object({
+   task_id: z.string().describe('Task ID to archive'),
+   cascade: z.boolean().optional().default(true).describe('Also archive all descendant tasks'),
+
+[0m
+Now let me apply all the archiver.ts fixes — validation, O(N^2) optimization, and types:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -52,8 +52,9 @@
+   });
+ }
+ 
+ const allTaskIds = allTasks.map(t => t.id);
++const taskMap = new Map(allTasks.map(t => [t.id, t]));
+ 
+ const depthCache = new Map<string, number>();
+ 
+ function computeDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
+@@ -63,9 +64,9 @@
+     depthCache.set(id, 0);
+     return 0;
+   }
+   visited.add(id);
+-  const parent = allTasks.find(t => t.id === parentId);
++  const parent = taskMap.get(parentId);
+   if (!parent) {
+     depthCache.set(id, 0);
+     return 0;
+   }
+
+[0m
+Now fix the O(N^2) depth computation with a Map in `handleTaskArchive`:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -196,8 +196,9 @@
+   });
+ }
+ 
+ const depthCache = new Map<string, number>();
++const restoreTaskMap = new Map(subtreeRows.map(t => [t.id, t]));
+ 
+ function computeRestoreDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
+   const cached = depthCache.get(id);
+   if (cached !== undefined) return cached;
+@@ -205,9 +206,9 @@
+     depthCache.set(id, 0);
+     return 0;
+   }
+   visited.add(id);
+-  const parent = subtreeRows.find(t => t.id === parentId);
++  const parent = restoreTaskMap.get(parentId);
+   if (!parent) {
+     depthCache.set(id, 0);
+     return 0;
+   }
+
+[0m
+Now fix depth computation in `handleTaskArchiveRestore`:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -137,8 +137,12 @@
+ let whereClause = '';
+ const params: unknown[] = [];
+ 
+ if (input.status) {
++  const parsed = TaskStatus.safeParse(input.status);
++  if (!parsed.success) {
++    return toMCPResponse({ error: 'Invalid status: ' + input.status + '. Valid: ' + TaskStatus.options.join(', ') });
++  }
+   whereClause = 'WHERE status = ?';
+   params.push(input.status);
+ }
+ 
+@@ -146,9 +150,9 @@
+   `SELECT id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at, archived_at
+    FROM archived_tasks ${whereClause}
+    ORDER BY archived_at DESC
+    LIMIT ? OFFSET ?`
+-).all(...params, input.limit, input.offset) as Array<Record<string, unknown>>;
++).all(...params, input.limit, input.offset) as ArchivedTaskRow[];
+ 
+ const totalRow = db.prepare(
+   `SELECT COUNT(*) AS cnt FROM archived_tasks ${whereClause}`
+ ).get(...params) as { cnt: number };
+
+[0m
+Now fix status validation in `handleTaskArchiveList` and use `ArchivedTaskRow` type:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -171,9 +171,9 @@
+ export async function handleTaskArchiveRestore(args: unknown) {
+   const input = TaskArchiveRestoreInput.parse(args);
+   const db = getDb();
+ 
+-  const task = db.prepare('SELECT * FROM archived_tasks WHERE id = ?').get(input.task_id) as TaskRow | undefined;
++  const task = db.prepare('SELECT * FROM archived_tasks WHERE id = ?').get(input.task_id) as ArchivedTaskRow | undefined;
+   if (!task) {
+     return toMCPResponse({ error: 'Archived task not found: ' + input.task_id });
+   }
+ 
+
+[0m
+Now update the restore function to use `ArchivedTaskRow` for archived_tasks queries:
+[0m✗ [0mEdit src/archiver.ts failed
+[91m[1mError: [0mFound multiple matches for oldString. Provide more surrounding context to make the match unique.
+[0m→ [0mRead src/archiver.ts[90m [offset=38, limit=15][0m
+[0m→ [0mRead src/archiver.ts[90m [limit=15, offset=172][0m
+[0m
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -182,9 +182,9 @@
+       WITH RECURSIVE subtree(id) AS (
+         SELECT ? UNION ALL SELECT t.id FROM archived_tasks t JOIN subtree s ON t.parent_id = s.id
+       )
+       SELECT * FROM archived_tasks WHERE id IN (SELECT id FROM subtree)
+-    `).all(input.task_id) as TaskRow[]
++    `).all(input.task_id) as ArchivedTaskRow[]
+   : [task];
+ 
+ const subtreeIds = subtreeRows.map(r => r.id);
+ 
+
+[0m
+[0m→ [0mRead src/archiver.ts
+Let me verify the full archiver.ts looks correct:
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[•] Build: Run npm run build
+[ ] Review: Call @explore to review fixes
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+File looks good. Let me build:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[✓] Build: Run npm run build
+[•] Review: Call @explore to review fixes
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+Build passes. Now let me call @explore for review:
+[0m• [0mReview task_archive fixes[90m Explore Agent[0m
+[0m✓ [0mReview task_archive fixes[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[✓] Build: Run npm run build
+[✓] Review: Call @explore to review fixes
+[•] ITERATE: Fix L2 TOCTOU - move subtree queries inside transactions
+[ ] ITERATE: Fix L1 - add try-catch around JSON.parse in depends_on
+[ ] ITERATE: Fix L3 - remove misleading DEFAULT from archived_tasks.status
+[ ] ITERATE: Fix M1 - add LIKE pre-filter for depends_on scan
+[ ] Rebuild and re-review
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+Review returned 88/100 with several issues. Let me fix the most impactful ones:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -34,67 +34,65 @@
+       });
+     }
+   }
+ 
+-  const allTasks = input.cascade
+-    ? db.prepare(`
+-        WITH RECURSIVE subtree(id) AS (
+-          SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
+-        )
+-        SELECT * FROM tasks WHERE id IN (SELECT id FROM subtree)
+-      `).all(input.task_id) as TaskRow[]
+-    : [task];
++  const result = db.transaction(() => {
++    const allTasks = input.cascade
++      ? db.prepare(`
++          WITH RECURSIVE subtree(id) AS (
++            SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
++          )
++          SELECT * FROM tasks WHERE id IN (SELECT id FROM subtree)
++        `).all(input.task_id) as TaskRow[]
++      : [task];
+ 
+-  const nonArchivable = allTasks.filter(t => !ARCHIVABLE_STATUSES.includes(t.status));
+-  if (nonArchivable.length > 0) {
+-    return toMCPResponse({
+-      error: 'Cannot archive tree: ' + nonArchivable.length + ' task(s) have non-archivable statuses: ' +
++    const nonArchivable = allTasks.filter(t => !ARCHIVABLE_STATUSES.includes(t.status));
++    if (nonArchivable.length > 0) {
++      throw new Error(
++        'Cannot archive tree: ' + nonArchivable.length + ' task(s) have non-archivable statuses: ' +
+         nonArchivable.map(t => t.id + ' (' + t.status + ')').join(', '),
+-    });
+-  }
++      );
++    }
+ 
+-  const allTaskIds = allTasks.map(t => t.id);
+-  const taskMap = new Map(allTasks.map(t => [t.id, t]));
++    const allTaskIds = allTasks.map(t => t.id);
++    const taskMap = new Map(allTasks.map(t => [t.id, t]));
+ 
+-  const depthCache = new Map<string, number>();
++    const depthCache = new Map<string, number>();
+ 
+-  function computeDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
+-    const cached = depthCache.get(id);
+-    if (cached !== undefined) return cached;
+-    if (visited.has(id) || !parentId) {
+-      depthCache.set(id, 0);
+-      return 0;
++    function computeDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
++      const cached = depthCache.get(id);
++      if (cached !== undefined) return cached;
++      if (visited.has(id) || !parentId) {
++        depthCache.set(id, 0);
++        return 0;
++      }
++      visited.add(id);
++      const parent = taskMap.get(parentId);
++      if (!parent) {
++        depthCache.set(id, 0);
++        return 0;
++      }
++      const d = 1 + computeDepth(parent.id, parent.parent_id, visited);
++      depthCache.set(id, d);
++      return d;
+     }
+-    visited.add(id);
+-    const parent = taskMap.get(parentId);
+-    if (!parent) {
+-      depthCache.set(id, 0);
+-      return 0;
++
++    for (const t of allTasks) {
++      computeDepth(t.id, t.parent_id);
+     }
+-    const d = 1 + computeDepth(parent.id, parent.parent_id, visited);
+-    depthCache.set(id, d);
+-    return d;
+-  }
+ 
+-  for (const t of allTasks) {
+-    computeDepth(t.id, t.parent_id);
+-  }
++    const sortedTasks = [...allTasks].sort((a, b) => (depthCache.get(b.id) ?? 0) - (depthCache.get(a.id) ?? 0));
+ 
+-  const sortedTasks = [...allTasks].sort((a, b) => (depthCache.get(b.id) ?? 0) - (depthCache.get(a.id) ?? 0));
++    const now = new Date().toISOString();
+ 
+-  const now = new Date().toISOString();
+-
+-  const archiveAll = db.transaction(() => {
+     const insertStmt = db.prepare(
+       `INSERT INTO archived_tasks (id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at, archived_at)
+        SELECT id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at, ? FROM tasks WHERE id = ?`
+     );
+ 
+     const deleteSnapshots = db.prepare('DELETE FROM snapshots WHERE task_id = ?');
+     const deleteAuditLog = db.prepare('DELETE FROM audit_log WHERE task_id = ?');
+     const deleteTask = db.prepare('DELETE FROM tasks WHERE id = ?');
+-    const getTaskDepends = db.prepare('SELECT id, depends_on FROM tasks WHERE depends_on != ?');
+-    const updateDepends = db.prepare('UPDATE tasks SET depends_on = ? WHERE id = ?');
+ 
+     for (const { id } of sortedTasks) {
+       insertStmt.run(now, id);
+       deleteSnapshots.run(id);
+@@ -102,27 +100,39 @@
+       deleteTask.run(id);
+     }
+ 
+     const archivedSet = new Set(allTaskIds);
+-    const remainingTasks = getTaskDepends.all('[]') as { id: string; depends_on: string }[];
++    const likePatterns = allTaskIds.map(id => `%\"${id}\"%`);
++    const likeClauses = likePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
++    const getTaskDepends = db.prepare(
++      `SELECT id, depends_on FROM tasks WHERE depends_on != '[]' AND (${likeClauses})`
++    );
++    const updateDepends = db.prepare('UPDATE tasks SET depends_on = ? WHERE id = ?');
++
++    const remainingTasks = getTaskDepends.all(...likePatterns) as { id: string; depends_on: string }[];
+     for (const rt of remainingTasks) {
+-      const deps: string[] = JSON.parse(rt.depends_on);
++      let deps: string[];
++      try {
++        deps = JSON.parse(rt.depends_on);
++      } catch {
++        throw new Error('Corrupted depends_on for task ' + rt.id + ': ' + rt.depends_on);
++      }
+       const cleaned = deps.filter(d => !archivedSet.has(d));
+       if (cleaned.length !== deps.length) {
+         updateDepends.run(JSON.stringify(cleaned), rt.id);
+       }
+     }
+-  });
+ 
+-  archiveAll();
++    return {
++      archived: task.id,
++      title: task.title,
++      subtrees_archived: allTasks.length,
++      cascade: input.cascade,
++      archived_at: now,
++    };
++  })();
+ 
+-  return toMCPResponse({
+-    archived: task.id,
+-    title: task.title,
+-    subtrees_archived: allTasks.length,
+-    cascade: input.cascade,
+-    archived_at: now,
+-  });
++  return toMCPResponse(result);
+ }
+ 
+ const TaskArchiveListInput = z.object({
+   status: z.string().optional().describe('Filter by status'),
+
+[0m
+Let me fix L2 (TOCTOU), L1 (JSON.parse), and M1 (LIKE filter) together by rewriting `handleTaskArchive`:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -186,61 +186,61 @@
+   if (!task) {
+     return toMCPResponse({ error: 'Archived task not found: ' + input.task_id });
+   }
+ 
+-  const subtreeRows = input.cascade
+-    ? db.prepare(`
+-        WITH RECURSIVE subtree(id) AS (
+-          SELECT ? UNION ALL SELECT t.id FROM archived_tasks t JOIN subtree s ON t.parent_id = s.id
+-        )
+-        SELECT * FROM archived_tasks WHERE id IN (SELECT id FROM subtree)
+-      `).all(input.task_id) as ArchivedTaskRow[]
+-    : [task];
++  const result = db.transaction(() => {
++    const subtreeRows = input.cascade
++      ? db.prepare(`
++          WITH RECURSIVE subtree(id) AS (
++            SELECT ? UNION ALL SELECT t.id FROM archived_tasks t JOIN subtree s ON t.parent_id = s.id
++          )
++          SELECT * FROM archived_tasks WHERE id IN (SELECT id FROM subtree)
++        `).all(input.task_id) as ArchivedTaskRow[]
++      : [task];
+ 
+-  const subtreeIds = subtreeRows.map(r => r.id);
++    const subtreeIds = subtreeRows.map(r => r.id);
+ 
+-  const placeholders = subtreeIds.map(() => '?').join(',');
+-  const conflicts = (db.prepare(
+-    `SELECT id FROM tasks WHERE id IN (${placeholders})`
+-  ).all(...subtreeIds) as { id: string }[]).map(r => r.id);
++    const placeholders = subtreeIds.map(() => '?').join(',');
++    const conflicts = (db.prepare(
++      `SELECT id FROM tasks WHERE id IN (${placeholders})`
++    ).all(...subtreeIds) as { id: string }[]).map(r => r.id);
+ 
+-  if (conflicts.length > 0) {
+-    return toMCPResponse({
+-      error: 'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', ') +
++    if (conflicts.length > 0) {
++      throw new Error(
++        'ID conflict: the following task IDs already exist in the active tasks table: ' + conflicts.join(', ') +
+         '. Remove active tasks first or use task_duplicate on the conflicting tasks before retrying restore.',
+-    });
+-  }
++      );
++    }
+ 
+-  const depthCache = new Map<string, number>();
+-  const restoreTaskMap = new Map(subtreeRows.map(t => [t.id, t]));
++    const depthCache = new Map<string, number>();
++    const restoreTaskMap = new Map(subtreeRows.map(t => [t.id, t]));
+ 
+-  function computeRestoreDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
+-    const cached = depthCache.get(id);
+-    if (cached !== undefined) return cached;
+-    if (visited.has(id) || !parentId) {
+-      depthCache.set(id, 0);
+-      return 0;
++    function computeRestoreDepth(id: string, parentId: string | null, visited = new Set<string>()): number {
++      const cached = depthCache.get(id);
++      if (cached !== undefined) return cached;
++      if (visited.has(id) || !parentId) {
++        depthCache.set(id, 0);
++        return 0;
++      }
++      visited.add(id);
++      const parent = restoreTaskMap.get(parentId);
++      if (!parent) {
++        depthCache.set(id, 0);
++        return 0;
++      }
++      const d = 1 + computeRestoreDepth(parent.id, parent.parent_id, visited);
++      depthCache.set(id, d);
++      return d;
+     }
+-    visited.add(id);
+-    const parent = restoreTaskMap.get(parentId);
+-    if (!parent) {
+-      depthCache.set(id, 0);
+-      return 0;
++
++    for (const t of subtreeRows) {
++      computeRestoreDepth(t.id, t.parent_id);
+     }
+-    const d = 1 + computeRestoreDepth(parent.id, parent.parent_id, visited);
+-    depthCache.set(id, d);
+-    return d;
+-  }
+ 
+-  for (const t of subtreeRows) {
+-    computeRestoreDepth(t.id, t.parent_id);
+-  }
++    const sortedRows = [...subtreeRows].sort((a, b) => (depthCache.get(a.id) ?? 0) - (depthCache.get(b.id) ?? 0));
+ 
+-  const sortedRows = [...subtreeRows].sort((a, b) => (depthCache.get(a.id) ?? 0) - (depthCache.get(b.id) ?? 0));
++    const subtreeSet = new Set(subtreeIds);
+ 
+-  const subtreeSet = new Set(subtreeIds);
+-
+-  const restoreAll = db.transaction(() => {
+     const checkParentExists = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
+ 
+     const insertStmt = db.prepare(
+       `INSERT INTO tasks (id, parent_id, title, description, goal, status, tool_name, result, error, review_comment, priority, retry_count, max_retries, depends_on, created_at, updated_at)
+@@ -248,10 +248,8 @@
+     );
+ 
+     const deleteArchived = db.prepare('DELETE FROM archived_tasks WHERE id = ?');
+     const depExistsInTasks = db.prepare('SELECT COUNT(*) AS cnt FROM tasks WHERE id = ?');
+-    const getArchivedDepends = db.prepare('SELECT id, depends_on FROM archived_tasks WHERE depends_on != ?');
+-    const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
+ 
+     for (const row of sortedRows) {
+       let resolvedParentId = row.parent_id;
+       if (resolvedParentId && !subtreeSet.has(resolvedParentId)) {
+@@ -262,9 +260,14 @@
+       }
+ 
+       let resolvedDependsOn = row.depends_on;
+       if (row.depends_on !== '[]') {
+-        const deps: string[] = JSON.parse(row.depends_on);
++        let deps: string[];
++        try {
++          deps = JSON.parse(row.depends_on);
++        } catch {
++          throw new Error('Corrupted depends_on for archived task ' + row.id + ': ' + row.depends_on);
++        }
+         const validDeps = deps.filter(d => {
+           if (subtreeSet.has(d)) return true;
+           return (depExistsInTasks.get(d) as { cnt: number }).cnt > 0;
+         });
+@@ -282,23 +285,35 @@
+       deleteArchived.run(row.id);
+     }
+ 
+     const restoredSet = new Set(subtreeIds);
+-    const remainingArchived = getArchivedDepends.all('[]') as { id: string; depends_on: string }[];
++    const likeRestorePatterns = subtreeIds.map(id => `%\"${id}\"%`);
++    const likeRestoreClauses = likeRestorePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
++    const getArchivedDepends = db.prepare(
++      `SELECT id, depends_on FROM archived_tasks WHERE depends_on != '[]' AND (${likeRestoreClauses})`
++    );
++    const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
++
++    const remainingArchived = getArchivedDepends.all(...likeRestorePatterns) as { id: string; depends_on: string }[];
+     for (const ra of remainingArchived) {
+-      const deps: string[] = JSON.parse(ra.depends_on);
++      let deps: string[];
++      try {
++        deps = JSON.parse(ra.depends_on);
++      } catch {
++        throw new Error('Corrupted depends_on for archived task ' + ra.id + ': ' + ra.depends_on);
++      }
+       const cleaned = deps.filter(d => !restoredSet.has(d));
+       if (cleaned.length !== deps.length) {
+         updateArchivedDepends.run(JSON.stringify(cleaned), ra.id);
+       }
+     }
+-  });
+ 
+-  restoreAll();
++    return {
++      restored: task.id,
++      title: task.title,
++      subtrees_restored: subtreeIds.length,
++      cascade: input.cascade,
++    };
++  })();
+ 
+-  return toMCPResponse({
+-    restored: task.id,
+-    title: task.title,
+-    subtrees_restored: subtreeIds.length,
+-    cascade: input.cascade,
+-  });
++  return toMCPResponse(result);
+ }
+
+[0m
+Now fix `handleTaskArchiveRestore` with the same TOCTOU + JSON.parse + LIKE improvements:
+[0m← [0mEdit src/db.ts
+Index: /home/administrator/task-orchestrator/src/db.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/db.ts
++++ /home/administrator/task-orchestrator/src/db.ts
+@@ -75,9 +75,9 @@
+ parent_id     TEXT,
+ title         TEXT NOT NULL,
+ description   TEXT,
+ goal          TEXT,
+-status        TEXT NOT NULL DEFAULT 'pending',
++status        TEXT NOT NULL,
+ tool_name     TEXT,
+ result        TEXT,
+ error         TEXT,
+ review_comment TEXT,
+
+[0m
+Now fix L3 — remove the misleading DEFAULT from `archived_tasks.status`:
+Let me build and verify:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m→ [0mRead src/archiver.ts
+[0m→ [0mRead src/types.ts[90m [offset=386, limit=25][0m
+[0m→ [0mRead src/db.ts[90m [offset=73, limit=20][0m
+Build passes. Let me verify the final files and then re-review:
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[✓] Build: Run npm run build
+[✓] Review: Call @explore to review fixes
+[✓] ITERATE: Fix L2 TOCTOU - move subtree queries inside transactions
+[✓] ITERATE: Fix L1 - add try-catch around JSON.parse in depends_on
+[✓] ITERATE: Fix L3 - remove misleading DEFAULT from archived_tasks.status
+[✓] ITERATE: Fix M1 - add LIKE pre-filter for depends_on scan
+[•] Rebuild and re-review
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+[0m• [0mRe-review task_archive after fixes[90m Explore Agent[0m
+[0m✓ [0mRe-review task_archive after fixes[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[✓] Build: Run npm run build
+[✓] Review: Call @explore to review fixes
+[✓] ITERATE: Fix L2 TOCTOU - move subtree queries inside transactions
+[✓] ITERATE: Fix L1 - add try-catch around JSON.parse in depends_on
+[✓] ITERATE: Fix L3 - remove misleading DEFAULT from archived_tasks.status
+[✓] ITERATE: Fix M1 - add LIKE pre-filter for depends_on scan
+[✓] Rebuild and re-review
+[•] ITERATE2: Fix empty LIKE clause guard + batch LIKE clauses
+[ ] Rebuild and final re-review
+[ ] Output: SCORE and REVIEW_COMPLETE
+[0m
+Score improved from 88 to 92. Let me fix the 2 remaining issues:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -100,27 +100,31 @@
+   deleteTask.run(id);
+ }
+ 
+ const archivedSet = new Set(allTaskIds);
+-const likePatterns = allTaskIds.map(id => `%\"${id}\"%`);
+-const likeClauses = likePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
+-const getTaskDepends = db.prepare(
+-  `SELECT id, depends_on FROM tasks WHERE depends_on != '[]' AND (${likeClauses})`
+-);
+ const updateDepends = db.prepare('UPDATE tasks SET depends_on = ? WHERE id = ?');
+ 
+-const remainingTasks = getTaskDepends.all(...likePatterns) as { id: string; depends_on: string }[];
+-for (const rt of remainingTasks) {
+-  let deps: string[];
+-  try {
+-    deps = JSON.parse(rt.depends_on);
+-  } catch {
+-    throw new Error('Corrupted depends_on for task ' + rt.id + ': ' + rt.depends_on);
++const BATCH_SIZE = 200;
++for (let i = 0; i < allTaskIds.length; i += BATCH_SIZE) {
++  const batch = allTaskIds.slice(i, i + BATCH_SIZE);
++  const likePatterns = batch.map(id => `%\"${id}\"%`);
++  const likeClauses = likePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
++  const getTaskDepends = db.prepare(
++    `SELECT id, depends_on FROM tasks WHERE depends_on != '[]' AND (${likeClauses})`
++  );
++  const remainingTasks = getTaskDepends.all(...likePatterns) as { id: string; depends_on: string }[];
++  for (const rt of remainingTasks) {
++    let deps: string[];
++    try {
++      deps = JSON.parse(rt.depends_on);
++    } catch {
++      throw new Error('Corrupted depends_on for task ' + rt.id + ': ' + rt.depends_on);
++    }
++    const cleaned = deps.filter(d => !archivedSet.has(d));
++    if (cleaned.length !== deps.length) {
++      updateDepends.run(JSON.stringify(cleaned), rt.id);
++    }
+   }
+-  const cleaned = deps.filter(d => !archivedSet.has(d));
+-  if (cleaned.length !== deps.length) {
+-    updateDepends.run(JSON.stringify(cleaned), rt.id);
+-  }
+ }
+ 
+ return {
+   archived: task.id,
+
+[0m
+Let me fix both remaining issues — empty LIKE guard and batched LIKE clauses:
+[0m← [0mEdit src/archiver.ts
+Index: /home/administrator/task-orchestrator/src/archiver.ts
+===================================================================
+--- /home/administrator/task-orchestrator/src/archiver.ts
++++ /home/administrator/task-orchestrator/src/archiver.ts
+@@ -289,27 +289,31 @@
+   deleteArchived.run(row.id);
+ }
+ 
+ const restoredSet = new Set(subtreeIds);
+-const likeRestorePatterns = subtreeIds.map(id => `%\"${id}\"%`);
+-const likeRestoreClauses = likeRestorePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
+-const getArchivedDepends = db.prepare(
+-  `SELECT id, depends_on FROM archived_tasks WHERE depends_on != '[]' AND (${likeRestoreClauses})`
+-);
+ const updateArchivedDepends = db.prepare('UPDATE archived_tasks SET depends_on = ? WHERE id = ?');
+ 
+-const remainingArchived = getArchivedDepends.all(...likeRestorePatterns) as { id: string; depends_on: string }[];
+-for (const ra of remainingArchived) {
+-  let deps: string[];
+-  try {
+-    deps = JSON.parse(ra.depends_on);
+-  } catch {
+-    throw new Error('Corrupted depends_on for archived task ' + ra.id + ': ' + ra.depends_on);
++const BATCH_SIZE = 200;
++for (let i = 0; i < subtreeIds.length; i += BATCH_SIZE) {
++  const batch = subtreeIds.slice(i, i + BATCH_SIZE);
++  const likeRestorePatterns = batch.map(id => `%\"${id}\"%`);
++  const likeRestoreClauses = likeRestorePatterns.map(() => 'depends_on LIKE ?').join(' OR ');
++  const getArchivedDepends = db.prepare(
++    `SELECT id, depends_on FROM archived_tasks WHERE depends_on != '[]' AND (${likeRestoreClauses})`
++  );
++  const remainingArchived = getArchivedDepends.all(...likeRestorePatterns) as { id: string; depends_on: string }[];
++  for (const ra of remainingArchived) {
++    let deps: string[];
++    try {
++      deps = JSON.parse(ra.depends_on);
++    } catch {
++      throw new Error('Corrupted depends_on for archived task ' + ra.id + ': ' + ra.depends_on);
++    }
++    const cleaned = deps.filter(d => !restoredSet.has(d));
++    if (cleaned.length !== deps.length) {
++      updateArchivedDepends.run(JSON.stringify(cleaned), ra.id);
++    }
+   }
+-  const cleaned = deps.filter(d => !restoredSet.has(d));
+-  if (cleaned.length !== deps.length) {
+-    updateArchivedDepends.run(JSON.stringify(cleaned), ra.id);
+-  }
+ }
+ 
+ return {
+   restored: task.id,
+
+[0m
+Same fix for restore:
+Now build and run final re-review:
+[0m$ [0mnpm run build 2>&1
+> task-orchestrator@0.1.0 build
+> tsc
+[0m
+[0m• [0mFinal review task_archive feature[90m Explore Agent[0m
+[0m✓ [0mFinal review task_archive feature[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[✓] Fix 1: Add ArchivedTaskRow type to types.ts
+[✓] Fix 2: Validate status filter in handleTaskArchiveList
+[✓] Fix 3: Optimize O(N^2) depth computation with Map in handleTaskArchive
+[✓] Fix 4: Optimize O(N^2) depth computation with Map in handleTaskArchiveRestore
+[✓] Fix 5: Use ArchivedTaskRow type in handleTaskArchiveList return
+[✓] Build: Run npm run build
+[✓] Review: Call @explore to review fixes
+[✓] ITERATE: Fix L2 TOCTOU - move subtree queries inside transactions
+[✓] ITERATE: Fix L1 - add try-catch around JSON.parse in depends_on
+[✓] ITERATE: Fix L3 - remove misleading DEFAULT from archived_tasks.status
+[✓] ITERATE: Fix M1 - add LIKE pre-filter for depends_on scan
+[✓] Rebuild and re-review
+[✓] ITERATE2: Fix empty LIKE clause guard + batch LIKE clauses
+[✓] Rebuild and final re-review
+[✓] Output: SCORE and REVIEW_COMPLETE
+[0m
+**SCORE: 100/100**
+
+**REVIEW_COMPLETE**
+
+All issues fixed across 3 iterations:
+
+| Round | Fixes | Score |
+|-------|-------|-------|
+| 1 | ArchivedTaskRow type, status validation, O(N^2)→O(1) depth, proper typing | — |
+| 2 | TOCTOU (transactions), JSON.parse try-catch, schema DEFAULT removal, LIKE pre-filter | 88→92 |
+| 3 | Batched LIKE clauses (BATCH_SIZE=200), empty-list guard via loop semantics | 92→100 |
+
+Files modified: `src/archiver.ts`, `src/types.ts`, `src/db.ts`. Build passes cleanly.
