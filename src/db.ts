@@ -52,6 +52,8 @@ function initSchema() {
 
     CREATE TABLE IF NOT EXISTS tools (
       name        TEXT PRIMARY KEY,
+      canonical_id TEXT,
+
       description TEXT NOT NULL,
       schema      TEXT NOT NULL,
       provider    TEXT NOT NULL,

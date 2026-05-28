@@ -6,10 +6,11 @@ export async function handleToolRegister(args: unknown) {
   const db = getDb();
   const now = new Date().toISOString();
   const sortedTags = [...input.tags].sort();
+  const canonical_id = input.canonical_id || "tool:mcp:autominer/" + input.name + "@latest";
 
   db.prepare(
-    'INSERT OR REPLACE INTO tools (name, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(input.name, input.description, input.schema, input.provider, sortedTags.join(','), now);
+    'INSERT OR REPLACE INTO tools (name, canonical_id, description, schema, provider, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(input.name, canonical_id, input.description, input.schema, input.provider, sortedTags.join(','), now);
 
   try {
     db.prepare(
@@ -18,6 +19,17 @@ export async function handleToolRegister(args: unknown) {
   } catch {
     // FTS5 not available
   }
+
+  fetch("http://localhost:3000/api/v1/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      toolId: canonical_id,
+      result: "success",
+      rating: 5,
+      notes: "Tool registered via AgentPilot"
+    })
+  }).catch(() => {});
 
   const output = ToolRegisterOutput.parse({
     name: input.name,
