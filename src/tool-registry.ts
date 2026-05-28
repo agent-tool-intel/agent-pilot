@@ -136,23 +136,68 @@ export async function handleToolSearch(args: unknown) {
   const input = ToolSearchInput.parse(args);
   const db = getDb();
 
+  // ── Primary: Agent Tool Intel semantic search ──
+  const INTEL_API = process.env.AGENT_TOOL_INTEL_URL || "https://agent-tool-intel-production.up.railway.app";
+
+  try {
+    const intelResp = await fetch(INTEL_API + "/api/v1/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: input.query,
+        maxResults: input.limit || 10,
+        categories: input.tags,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (intelResp.ok) {
+      const intelData = await intelResp.json() as any;
+
+      if (intelData.results && intelData.results.length > 0) {
+        return toMCPResponse({
+          source: "agent-tool-intel",
+          results: intelData.results.map((r: any) => ({
+            name: r.toolName,
+            description: r.recommendationSummary || r.serverName,
+            schema: JSON.stringify({
+              server: r.serverName,
+              quality: r.quality,
+              trust: r.trust,
+              security: r.security,
+              install: r.install,
+            }),
+            provider: r.install?.method || "mcp",
+            tags: [r.quality?.grade, r.efficiency?.rating, r.security?.grade].filter(Boolean),
+            relevance_score: r.relevanceScore,
+            quality_grade: r.quality?.grade,
+            trust_score: r.trust?.score,
+          })),
+        });
+      }
+    }
+  } catch (_err) {
+    // Intel API unreachable — fall through to local FTS5
+  }
+
+  // ── Fallback: local SQLite FTS5 ──
   let results: ToolRow[];
 
   try {
     const ftsQuery = input.query
-      .replace(/[^\p{L}\p{N}_ -]/gu, ' ')
+      .replace(/[^\p{L}\p{N}_ -]/gu, " ")
       .trim()
       .split(/\s+/)
       .filter((w: string) => w.length > 0)
-      .map((w: string) => '"' + w + '"')
-      .join(' OR ');
+      .map((w: string) => "\"" + w + "\"")
+      .join(" OR ");
 
     if (!ftsQuery) {
       return toMCPResponse({ results: [] });
     }
 
     results = db.prepare(
-      'SELECT t.*, f.rank AS relevance_score FROM tools_fts f JOIN tools t ON t.rowid = f.rowid WHERE tools_fts MATCH ? ORDER BY rank LIMIT ?'
+      "SELECT t.*, f.rank AS relevance_score FROM tools_fts f JOIN tools t ON t.rowid = f.rowid WHERE tools_fts MATCH ? ORDER BY rank LIMIT ?"
     ).all(ftsQuery, input.limit) as ToolRow[];
 
     const maxRank = results.length > 0 ? Math.max(...results.map((r: ToolRow) => r.relevance_score || 0)) : 1;
@@ -160,26 +205,27 @@ export async function handleToolSearch(args: unknown) {
       r.relevance_score = maxRank > 0 ? Math.round((r.relevance_score || 0) / maxRank * 100) / 100 : 1.0;
     });
   } catch {
-    const like = '%' + input.query + '%';
+    const like = "%" + input.query + "%";
     results = db.prepare(
-      'SELECT *, 1.0 AS relevance_score FROM tools WHERE name LIKE ? OR description LIKE ? OR tags LIKE ? LIMIT ?'
+      "SELECT *, 1.0 AS relevance_score FROM tools WHERE name LIKE ? OR description LIKE ? OR tags LIKE ? LIMIT ?"
     ).all(like, like, like, input.limit) as ToolRow[];
   }
 
   if (input.tags && input.tags.length > 0) {
     results = results.filter((r: ToolRow) => {
-      const toolTags = (r.tags || '').split(',').map((t: string) => t.trim().toLowerCase());
+      const toolTags = (r.tags || "").split(",").map((t: string) => t.trim().toLowerCase());
       return input.tags!.some((reqTag: string) => toolTags.includes(reqTag.toLowerCase()));
     });
   }
 
   return toMCPResponse({
+    source: "local-fts5",
     results: results.slice(0, input.limit).map((r: ToolRow) => ({
       name: r.name,
       description: r.description,
       schema: r.schema,
       provider: r.provider,
-      tags: (r.tags || '').split(',').filter(Boolean),
+      tags: (r.tags || "").split(",").filter(Boolean),
       relevance_score: r.relevance_score || 1.0,
     })),
   });
