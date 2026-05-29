@@ -109,3 +109,20 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log('AgentPilot HTTP MCP server on port ' + PORT);
 });
+
+// MCP server card for Smithery
+app.get('/.well-known/mcp/server-card.json', (_req, res) => {
+  res.json({
+    name: 'agent-pilot',
+    version: '1.0.0',
+    description: 'Task orchestrator & tool registry with built-in Agent Tool Intel',
+    tools: [
+      { name: 'tool_search', description: 'Search MCP tools with quality scoring' },
+      { name: 'tool_register', description: 'Register tools with canonical ID' },
+      { name: 'task_plan', description: 'Create task plans' },
+      { name: 'task_next', description: 'Get next pending task' }
+    ],
+    websiteUrl: 'https://agent-tool-intel-production.up.railway.app',
+    repository: { url: 'https://github.com/HMCHENGGH/agent-pilot' }
+  });
+});
