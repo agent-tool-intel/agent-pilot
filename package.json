@@ -2,7 +2,17 @@
   "name": "agent-pilot",
   "version": "1.0.0",
   "description": "MCP server providing AI agents with persistent, auditable task infrastructure — stateful task engine + AI-native tool registry + zero-LLM Model Router via SQLite",
-  "keywords": ["mcp", "agent-pilot", "ai-agent", "infrastructure", "sqlite", "model-router", "state-machine", "fts5", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "agent-pilot",
+    "ai-agent",
+    "infrastructure",
+    "sqlite",
+    "model-router",
+    "state-machine",
+    "fts5",
+    "model-context-protocol"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/anomalyco/agent-pilot.git"
@@ -12,13 +22,16 @@
   "scripts": {
     "build": "tsc && mkdir -p dist/config && cp src/config/plan-*.json dist/config/",
     "start": "node dist/index.js",
+    "start:http": "tsx src/http-server.ts",
     "dev": "tsc && node dist/index.js",
     "test": "npx --yes tsx test/test-all.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
+    "@types/express": "^5.0.6",
     "better-sqlite3": "^11.7.0",
+    "express": "^5.2.1",
     "uuid": "^11.1.0",
     "zod": "^3.24.0"
   },
