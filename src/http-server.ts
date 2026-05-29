@@ -90,6 +90,7 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', name: 'agent-pilot', version: '1.0.0' }));
+// MCP server card for Smithery discoveryapp.get("/.well-known/mcp/server-card.json", (_req, res) => {  res.json({    name: "agent-pilot",    version: "1.0.0",    description: "Task orchestrator & tool registry with built-in Agent Tool Intelligence. 28+ MCP tools: task management, semantic tool search with quality scoring, trust engine, model routing.",    tools: [      { name: "tool_search", description: "Search for MCP tools using Agent Tool Intel semantic search with quality scores" },      { name: "tool_register", description: "Register a new tool with canonical ID and auto-feedback" },      { name: "task_plan", description: "Create a task plan with subtasks" },      { name: "task_next", description: "Get next pending task" },      { name: "task_update", description: "Update task status" },      { name: "task_status", description: "Get task status overview" },      { name: "tool_stats", description: "Tool registry statistics" },      { name: "system_info", description: "System information and health check" }    ],    websiteUrl: "https://agent-tool-intel-production.up.railway.app",    repository: { url: "https://github.com/HMCHENGGH/agent-pilot" }  });});
 
 // MCP endpoint for Smithery
 app.post('/mcp', async (req, res) => {
