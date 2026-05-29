@@ -115,13 +115,13 @@ app.post('/mcp', async (req, res) => {
       id,
       result: {
         tools: [
-          { name: 'tool_search', description: 'Search MCP tools with Agent Tool Intel semantic quality scoring' },
-          { name: 'tool_register', description: 'Register tools with canonical ID and auto-feedback' },
-          { name: 'task_plan', description: 'Create task plans with subtasks' },
-          { name: 'task_next', description: 'Get next pending task' },
-          { name: 'task_update', description: 'Update task status' },
-          { name: 'task_status', description: 'Get task status overview' },
-          { name: 'system_info', description: 'System info and health check' }
+          { name: 'tool_search', description: 'Search MCP tools with Agent Tool Intel semantic quality scoring', inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Natural language search query' } }, required: ['query'] } },
+          { name: 'tool_register', description: 'Register tools with canonical ID and auto-feedback', inputSchema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, schema: { type: 'string' }, provider: { type: 'string' } }, required: ['name', 'description', 'schema', 'provider'] } },
+          { name: 'task_plan', description: 'Create task plans with subtasks', inputSchema: { type: 'object', properties: { goal: { type: 'string' } }, required: ['goal'] } },
+          { name: 'task_next', description: 'Get next pending task', inputSchema: { type: 'object', properties: {} } },
+          { name: 'task_update', description: 'Update task status', inputSchema: { type: 'object', properties: { task_id: { type: 'string' }, status: { type: 'string' } }, required: ['task_id', 'status'] } },
+          { name: 'task_status', description: 'Get task status overview', inputSchema: { type: 'object', properties: {} } },
+          { name: 'system_info', description: 'System info and health check', inputSchema: { type: 'object', properties: {} } }
         ]
       }
     });
