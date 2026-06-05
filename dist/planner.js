@@ -66,7 +66,7 @@ function buildTaskTreeOutput(db, rootId, goal) {
 export async function handleTaskStatus(args) {
     const input = TaskStatusInput.parse(args);
     const db = getDb();
-    const rootId = input.task_id || getLatestRoot(db);
+    const rootId = input.task_id || getLatestRoot();
     if (!rootId) {
         return toMCPResponse({ root: null, tasks: [], error: 'No tasks found' });
     }

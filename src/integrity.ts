@@ -1,10 +1,9 @@
 import { getDb } from './db.js';
 import { toMCPResponse, TaskStatus, DataIntegrityCheckInput, type IntegrityIssue } from './types.js';
-import type Database from 'better-sqlite3';
 
 const VALID_STATUSES = [...TaskStatus.options] as readonly string[];
 
-function runAllChecks(db: Database.Database): IntegrityIssue[] {
+function runAllChecks(db: any): IntegrityIssue[] {
   const issues: IntegrityIssue[] = [];
 
   const allTaskIds = new Set<string>();
@@ -227,7 +226,7 @@ function runAllChecks(db: Database.Database): IntegrityIssue[] {
   return issues;
 }
 
-function performRepairs(db: Database.Database) {
+function performRepairs(db: any) {
   const placeholders = VALID_STATUSES.map(() => '?').join(',');
 
   db.prepare(

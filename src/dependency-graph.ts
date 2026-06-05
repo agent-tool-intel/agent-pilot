@@ -160,7 +160,7 @@ export async function handleTaskDependencyGraph(args: unknown) {
   const input = TaskDependencyGraphInput.parse(args);
   const db = getDb();
 
-  const rootId = input.task_id || getLatestRoot(db);
+  const rootId = input.task_id || getLatestRoot();
   if (!rootId) {
     return toMCPResponse({ error: 'No root task found. Create a plan first with task_plan.' });
   }

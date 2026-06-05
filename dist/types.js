@@ -127,6 +127,7 @@ export const ToolRegisterInput = z.object({
     name: z.string().min(1).regex(/^[a-z_][a-z0-9_]*$/).describe('Tool name (snake_case)'),
     description: z.string().min(1).describe('What this tool does'),
     schema: z.string().describe('JSON Schema string of input parameters'),
+    canonical_id: z.string().optional().describe('Platform-wide tool identity: tool:{source}:{ns}/{name}@version'),
     provider: z.string().describe('Which MCP server or service provides this'),
     tags: z.array(z.string().regex(/^[^,]+$/, 'Tags cannot contain commas')).optional().default([]),
 });

@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
-import { getDb } from './db.js';
+import { getDb, initDb } from './db.js';
 import { handleTaskPlan, handleTaskStatus } from './planner.js';
 import { handleTaskNext, handleTaskUpdate } from './state-machine.js';
 import { handleTaskReflect } from './reflector.js';
@@ -457,6 +457,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 });
 async function main() {
+    await initDb();
     const db = getDb();
     console.error('AgentPilot MCP Server v1.0.0 running on stdio');
     console.error('Database:', db.name);

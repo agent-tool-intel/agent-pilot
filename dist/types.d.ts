@@ -445,6 +445,7 @@ export declare const ToolRegisterInput: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodString;
     schema: z.ZodString;
+    canonical_id: z.ZodOptional<z.ZodString>;
     provider: z.ZodString;
     tags: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
 }, "strip", z.ZodTypeAny, {
@@ -453,11 +454,13 @@ export declare const ToolRegisterInput: z.ZodObject<{
     schema: string;
     provider: string;
     tags: string[];
+    canonical_id?: string | undefined;
 }, {
     description: string;
     name: string;
     schema: string;
     provider: string;
+    canonical_id?: string | undefined;
     tags?: string[] | undefined;
 }>;
 export type ToolRegisterInput = z.infer<typeof ToolRegisterInput>;
@@ -1020,6 +1023,7 @@ export interface ArchivedTaskRow extends TaskRow {
 }
 export interface ToolRow {
     name: string;
+    canonical_id: string | null;
     description: string;
     schema: string;
     provider: string;

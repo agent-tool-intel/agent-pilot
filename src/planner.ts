@@ -91,7 +91,7 @@ export async function handleTaskStatus(args: unknown) {
   const input = TaskStatusInput.parse(args);
   const db = getDb();
 
-  const rootId = input.task_id || getLatestRoot(db);
+  const rootId = input.task_id || getLatestRoot();
   if (!rootId) {
     return toMCPResponse({ root: null, tasks: [], error: 'No tasks found' });
   }

@@ -18,7 +18,7 @@ export async function handleTaskNext(args: unknown) {
   const input = TaskNextInput.parse(args);
   const db = getDb();
 
-  const rootId = input.task_id || getLatestRoot(db);
+  const rootId = input.task_id || getLatestRoot();
   if (!rootId) {
     return toMCPResponse({
       next_task: null,
